@@ -18,6 +18,7 @@ import { BottomHud } from './components/BottomHud';
 import { NpcEditorPanel } from './components/NpcEditorPanel';
 import { PlayNpcOverlay } from './components/PlayNpcOverlay';
 import { NpcRelationGraphModal } from './components/NpcRelationGraphModal';
+import { MiniMap } from './components/MiniMap';
 
 function cloneNpcTemplate(template: NpcTemplate): NpcTemplate {
   return {
@@ -343,6 +344,21 @@ export default function App() {
     engineRef.current?.focusCameraOnNpc(npcId);
   }, []);
 
+  const handleGetMinimapState = useCallback(() => {
+    return engineRef.current?.getMinimapState() ?? null;
+  }, []);
+
+  const handleMinimapNavigate = useCallback((x: number, z: number) => {
+    engineRef.current?.navigateToWorldPoint(x, z);
+  }, []);
+
+  const handleMinimapFocusEntity = useCallback(
+    (kind: 'npc' | 'vehicle' | 'object', id: string) => {
+      engineRef.current?.focusEntityFromMinimap(kind, id);
+    },
+    []
+  );
+
   const handleEditNpcFromGraph = useCallback(
     (npcId: string) => {
       engineRef.current?.focusCameraOnNpc(npcId);
@@ -495,6 +511,15 @@ export default function App() {
         onAcceptQuest={handleAcceptQuest}
         onClaimReward={handleClaimReward}
       />
+
+      {!relationGraphOpen && (
+        <MiniMap
+          getMinimapState={handleGetMinimapState}
+          onNavigatePoint={handleMinimapNavigate}
+          onFocusEntity={handleMinimapFocusEntity}
+          shiftLeftForRightPanel={snapshot.mode === 'editor' && npcEditor !== null}
+        />
+      )}
 
       <BottomHud snapshot={snapshot} onTalkToNearNpc={handleTalkToNearNpc} />
 

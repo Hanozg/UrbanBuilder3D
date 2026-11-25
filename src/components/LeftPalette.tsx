@@ -59,6 +59,12 @@ import {
   Fan,
   Gem,
   Swords,
+  Waves,
+  Umbrella,
+  CircleDot,
+  Anchor,
+  LifeBuoy,
+  Sailboat,
 } from 'lucide-react';
 import {
   ActiveTool,
@@ -102,6 +108,7 @@ interface LeftPaletteProps {
 const CATEGORY_ICONS: Record<PaletteCategory, React.ReactNode> = {
   roads: <Route className="h-3.5 w-3.5 shrink-0" />,
   vehicles: <Plane className="h-3.5 w-3.5 shrink-0" />,
+  summer: <Umbrella className="h-3.5 w-3.5 shrink-0" />,
   middleEarth: <Castle className="h-3.5 w-3.5 shrink-0" />,
   buildings: <Building2 className="h-3.5 w-3.5 shrink-0" />,
   bazaar: <Store className="h-3.5 w-3.5 shrink-0" />,
@@ -188,6 +195,20 @@ const ITEM_ICONS: Record<PlaceableType, React.ReactNode> = {
   beaconTower: <Flame className="h-4 w-4 shrink-0" />,
   runeMonolith: <Gem className="h-4 w-4 shrink-0" />,
   dragonStatue: <Swords className="h-4 w-4 shrink-0" />,
+
+  // Yaz & Plaj Konsepti
+  seaWaterPatch: <Waves className="h-4 w-4 shrink-0" />,
+  sandyBeachShore: <Sun className="h-4 w-4 shrink-0" />,
+  beachVolleyball: <CircleDot className="h-4 w-4 shrink-0" />,
+  summerVilla: <Home className="h-4 w-4 shrink-0" />,
+  beachBungalow: <Tent className="h-4 w-4 shrink-0" />,
+  swimmingPool: <Droplets className="h-4 w-4 shrink-0" />,
+  woodenPier: <Anchor className="h-4 w-4 shrink-0" />,
+  beachCabanaSet: <Umbrella className="h-4 w-4 shrink-0" />,
+  lifeguardTower: <LifeBuoy className="h-4 w-4 shrink-0" />,
+  beachBarTiki: <Coffee className="h-4 w-4 shrink-0" />,
+  sailboatDocked: <Sailboat className="h-4 w-4 shrink-0" />,
+  surfboardRack: <Wind className="h-4 w-4 shrink-0" />,
 };
 
 export const LeftPalette: React.FC<LeftPaletteProps> = ({
@@ -221,6 +242,7 @@ export const LeftPalette: React.FC<LeftPaletteProps> = ({
     const counts: Record<PaletteCategory, number> = {
       roads: ROAD_CATALOG.length,
       vehicles: VEHICLE_CATALOG.length,
+      summer: 0,
       middleEarth: 0,
       buildings: 0,
       bazaar: 0,

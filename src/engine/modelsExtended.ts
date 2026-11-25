@@ -751,37 +751,82 @@ function buildTempleRuins(mats: MaterialLibrary): BuiltAsset {
   };
 }
 
-/** Dikilitaş & Antik Eser Anıtı */
+/** Dikilitaş & Antik Eser Anıtı (Sculpted Lathe Marble & Bronze Lion-Paw Supports) */
 function buildObeliskMonument(mats: MaterialLibrary): BuiltAsset {
   const group = new THREE.Group();
 
-  const step1 = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.4, 3.2), mats.travertineDark);
-  step1.position.y = 0.2;
-  group.add(step1);
+  const marbleSculpt = new THREE.MeshStandardMaterial({
+    color: 0xe6dfd1,
+    map: mats.travertine.map,
+    roughness: 0.65,
+    metalness: 0.3,
+    flatShading: false,
+  });
+  const marbleDark = new THREE.MeshStandardMaterial({
+    color: 0xcabfae,
+    map: mats.travertineDark.map,
+    roughness: 0.68,
+    metalness: 0.3,
+    flatShading: false,
+  });
+  const bronzeSculpt = new THREE.MeshStandardMaterial({
+    color: 0xc49a48,
+    roughness: 0.52,
+    metalness: 0.36,
+    flatShading: false,
+  });
 
-  const pedestal = new THREE.Mesh(new THREE.BoxGeometry(2.1, 1.65, 2.1), mats.travertine);
-  pedestal.position.y = 1.22;
+  // Turned stepped classical marble pedestal via LatheGeometry
+  const baseProfile = [
+    new THREE.Vector2(0.01, 0.0),
+    new THREE.Vector2(1.82, 0.0),
+    new THREE.Vector2(1.78, 0.36),
+    new THREE.Vector2(1.52, 0.48),
+    new THREE.Vector2(1.32, 0.72),
+    new THREE.Vector2(1.18, 1.78),
+    new THREE.Vector2(1.36, 1.98),
+    new THREE.Vector2(1.22, 2.12),
+    new THREE.Vector2(0.01, 2.12),
+  ];
+  const pedestal = new THREE.Mesh(new THREE.LatheGeometry(baseProfile, 36), marbleSculpt);
   group.add(pedestal);
 
-  // Bronze corner lion-paw plinth blocks
-  for (const sx of [-0.68, 0.68]) {
-    for (const sz of [-0.68, 0.68]) {
-      const foot = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.32, 0.36), mats.bronzeGold);
-      foot.position.set(sx, 2.2, sz);
-      group.add(foot);
+  // 4 sculpted rounded bronze lion-paw supports (Capsule + Sphere joints, no BoxGeometry)
+  for (const sx of [-0.58, 0.58]) {
+    for (const sz of [-0.58, 0.58]) {
+      const paw = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.14, 10, 18), bronzeSculpt);
+      paw.position.set(sx, 2.24, sz);
+      group.add(paw);
+      const collar = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.04, 10, 20), bronzeSculpt);
+      collar.rotation.x = Math.PI / 2;
+      collar.position.set(sx, 2.14, sz);
+      group.add(collar);
     }
   }
 
-  // Tapered monolithic obelisk shaft
-  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.78, 6.6, 4), mats.travertineDark);
-  shaft.rotation.y = Math.PI / 4;
-  shaft.position.y = 2.35 + 3.3;
+  // Smooth tapered monolithic shaft with decorative bronze collar & gilded finial
+  const shaftProfile = [
+    new THREE.Vector2(0.76, 2.34),
+    new THREE.Vector2(0.72, 3.2),
+    new THREE.Vector2(0.62, 5.6),
+    new THREE.Vector2(0.50, 8.2),
+    new THREE.Vector2(0.45, 8.95),
+  ];
+  const shaft = new THREE.Mesh(new THREE.LatheGeometry(shaftProfile, 24), marbleDark);
   group.add(shaft);
 
-  // Golden gilded pyramidion apex
-  const apex = new THREE.Mesh(new THREE.ConeGeometry(0.46, 0.95, 4), mats.bronzeGold);
-  apex.rotation.y = Math.PI / 4;
-  apex.position.y = 9.42;
+  const neckRing = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.055, 12, 28), bronzeSculpt);
+  neckRing.rotation.x = Math.PI / 2;
+  neckRing.position.y = 8.92;
+  group.add(neckRing);
+
+  const apexProfile = [
+    new THREE.Vector2(0.47, 8.95),
+    new THREE.Vector2(0.32, 9.48),
+    new THREE.Vector2(0.12, 9.88),
+    new THREE.Vector2(0.01, 10.05),
+  ];
+  const apex = new THREE.Mesh(new THREE.LatheGeometry(apexProfile, 28), bronzeSculpt);
   group.add(apex);
 
   enableShadows(group, true, true);
@@ -794,43 +839,90 @@ function buildObeliskMonument(mats: MaterialLibrary): BuiltAsset {
   };
 }
 
-/** Antik Amfora & Kalıntı Kümesi */
+/** Antik Amfora & Kalıntı Kümesi (High-Segment Lathe Amphorae with TubeGeometry Handles) */
 function buildAmphoraCluster(mats: MaterialLibrary): BuiltAsset {
   const group = new THREE.Group();
 
-  // Weather-worn stone slab base
-  const slab = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.24, 1.9), mats.travertineDark);
-  slab.position.y = 0.12;
+  const marbleStone = new THREE.MeshStandardMaterial({
+    color: 0xddd4c2,
+    map: mats.travertine.map,
+    roughness: 0.68,
+    metalness: 0.3,
+    flatShading: false,
+  });
+  const clayMat = new THREE.MeshStandardMaterial({
+    color: 0xc26e46,
+    roughness: 0.7,
+    metalness: 0.08,
+    flatShading: false,
+  });
+
+  // Smooth rounded weathered marble stone base (LatheGeometry instead of BoxGeometry)
+  const slabProfile = [
+    new THREE.Vector2(0.01, 0.0),
+    new THREE.Vector2(1.28, 0.0),
+    new THREE.Vector2(1.24, 0.16),
+    new THREE.Vector2(1.16, 0.24),
+    new THREE.Vector2(0.01, 0.24),
+  ];
+  const slab = new THREE.Mesh(new THREE.LatheGeometry(slabProfile, 32), marbleStone);
+  slab.scale.set(1.06, 1.0, 0.88);
   group.add(slab);
 
-  // Broken fluted drum
-  const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.44, 0.95, 14), mats.travertine);
-  drum.position.set(-0.55, 0.7, -0.2);
+  // Turned fluted marble column drum fragment
+  const drumProfile = [
+    new THREE.Vector2(0.45, 0.22),
+    new THREE.Vector2(0.48, 0.3),
+    new THREE.Vector2(0.43, 0.38),
+    new THREE.Vector2(0.42, 1.12),
+    new THREE.Vector2(0.45, 1.18),
+    new THREE.Vector2(0.01, 1.18),
+  ];
+  const drum = new THREE.Mesh(new THREE.LatheGeometry(drumProfile, 32), marbleStone);
+  drum.position.set(-0.55, 0, -0.18);
   group.add(drum);
 
-  // LatheGeometry Mediterranean ceramic amphorae
+  // Sculpted high-segment LatheGeometry amphora builder with curved TubeGeometry handles
   const ampProfile = [
-    new THREE.Vector2(0.02, 0),
-    new THREE.Vector2(0.14, 0.08),
-    new THREE.Vector2(0.32, 0.48),
-    new THREE.Vector2(0.28, 0.82),
-    new THREE.Vector2(0.11, 1.02),
-    new THREE.Vector2(0.14, 1.24),
-    new THREE.Vector2(0.19, 1.3),
+    new THREE.Vector2(0.01, 0.0),
+    new THREE.Vector2(0.11, 0.03),
+    new THREE.Vector2(0.17, 0.14),
+    new THREE.Vector2(0.32, 0.44),
+    new THREE.Vector2(0.34, 0.66),
+    new THREE.Vector2(0.25, 0.88),
+    new THREE.Vector2(0.12, 1.02),
+    new THREE.Vector2(0.11, 1.22),
+    new THREE.Vector2(0.185, 1.3),
+    new THREE.Vector2(0.155, 1.32),
+    new THREE.Vector2(0.095, 1.22),
   ];
-  const ampGeo = new THREE.LatheGeometry(ampProfile, 16);
+  const ampGeo = new THREE.LatheGeometry(ampProfile, 32);
 
-  const a1 = new THREE.Mesh(ampGeo, mats.terracottaPot);
+  const makeAmphora = () => {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(ampGeo, clayMat));
+    for (const sx of [-1, 1]) {
+      const handleCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(sx * 0.12, 1.2, 0),
+        new THREE.Vector3(sx * 0.28, 1.14, 0),
+        new THREE.Vector3(sx * 0.3, 0.84, 0),
+      ]);
+      g.add(new THREE.Mesh(new THREE.TubeGeometry(handleCurve, 18, 0.024, 10, false), clayMat));
+    }
+    return g;
+  };
+
+  const a1 = makeAmphora();
   a1.position.set(0.48, 0.24, 0.15);
   group.add(a1);
 
-  const a2 = new THREE.Mesh(ampGeo, mats.terracottaPot);
+  const a2 = makeAmphora();
   a2.scale.setScalar(0.8);
-  a2.position.set(0.1, 0.24, 0.45);
-  a2.rotation.z = 0.18;
+  a2.position.set(0.08, 0.24, 0.46);
+  a2.rotation.z = 0.16;
   group.add(a2);
 
-  const a3 = new THREE.Mesh(ampGeo, mats.terracottaPot);
+  const a3 = makeAmphora();
   a3.scale.setScalar(0.72);
   a3.position.set(0.65, 0.42, -0.42);
   a3.rotation.x = 1.35;
@@ -849,44 +941,90 @@ function buildAmphoraCluster(mats: MaterialLibrary): BuiltAsset {
 
 // ==================== EĞLENCE & MEYDAN ====================
 
-/** Meydan Fıskiyesi */
+/** Meydan Fıskiyesi (Turned Marble LatheGeometry Bowls & Arching TubeGeometry Water Jets) */
 function buildFountain(mats: MaterialLibrary): BuiltAsset {
   const group = new THREE.Group();
 
-  // Octagonal marble outer basin wall
-  const outerWall = new THREE.Mesh(new THREE.CylinderGeometry(2.75, 2.85, 0.72, 8), mats.travertine);
-  outerWall.position.y = 0.36;
-  group.add(outerWall);
+  const marbleLight = new THREE.MeshStandardMaterial({
+    color: 0xede6d9,
+    map: mats.travertine.map,
+    roughness: 0.58,
+    metalness: 0.3,
+    flatShading: false,
+  });
+  const marbleTrim = new THREE.MeshStandardMaterial({
+    color: 0xd5cab6,
+    map: mats.travertineDark.map,
+    roughness: 0.62,
+    metalness: 0.3,
+    flatShading: false,
+  });
 
-  // Sparkling turquoise water basin surface
-  const water = new THREE.Mesh(new THREE.CylinderGeometry(2.35, 2.35, 0.12, 8), mats.waterTurquoise);
-  water.position.y = 0.68;
+  // Sculpted circular outer marble basin with curved lip via LatheGeometry
+  const outerProfile = [
+    new THREE.Vector2(0.01, 0.0),
+    new THREE.Vector2(2.92, 0.0),
+    new THREE.Vector2(2.86, 0.22),
+    new THREE.Vector2(2.74, 0.64),
+    new THREE.Vector2(2.88, 0.76),
+    new THREE.Vector2(2.76, 0.84),
+    new THREE.Vector2(2.42, 0.82),
+    new THREE.Vector2(2.38, 0.56),
+    new THREE.Vector2(0.01, 0.56),
+  ];
+  const outerBasin = new THREE.Mesh(new THREE.LatheGeometry(outerProfile, 44), marbleLight);
+  group.add(outerBasin);
+
+  // Sparkling turquoise lower basin water
+  const water = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 0.08, 40), mats.waterTurquoise);
+  water.position.y = 0.7;
   group.add(water);
 
-  // Center pedestal + 2 carved bowls + top finial jet
-  const stem1 = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.65, 1.3, 12), mats.travertineDark);
-  stem1.position.y = 1.15;
-  group.add(stem1);
+  // Sculpted baluster centerpiece & twin tiered bowls via continuous LatheGeometry
+  const tierProfile = [
+    new THREE.Vector2(0.74, 0.55),
+    new THREE.Vector2(0.68, 0.75),
+    new THREE.Vector2(0.46, 1.05),
+    new THREE.Vector2(0.56, 1.35),
+    new THREE.Vector2(0.42, 1.65),
+    new THREE.Vector2(1.12, 1.82),
+    new THREE.Vector2(1.42, 2.02),
+    new THREE.Vector2(1.34, 2.12),
+    new THREE.Vector2(1.18, 2.02),
+    new THREE.Vector2(0.36, 1.96),
+    new THREE.Vector2(0.32, 2.38),
+    new THREE.Vector2(0.24, 2.75),
+    new THREE.Vector2(0.76, 2.94),
+    new THREE.Vector2(0.84, 3.08),
+    new THREE.Vector2(0.74, 3.12),
+    new THREE.Vector2(0.18, 3.04),
+    new THREE.Vector2(0.14, 3.38),
+    new THREE.Vector2(0.01, 3.48),
+  ];
+  const centerpiece = new THREE.Mesh(new THREE.LatheGeometry(tierProfile, 40), marbleTrim);
+  group.add(centerpiece);
 
-  const bowl1 = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 0.45, 0.38, 16), mats.travertine);
-  bowl1.position.y = 1.85;
-  group.add(bowl1);
-
-  const water1 = new THREE.Mesh(new THREE.CylinderGeometry(1.18, 1.18, 0.08, 16), mats.waterTurquoise);
-  water1.position.y = 2.02;
+  const water1 = new THREE.Mesh(new THREE.CylinderGeometry(1.22, 1.22, 0.06, 36), mats.waterTurquoise);
+  water1.position.y = 2.04;
   group.add(water1);
 
-  const stem2 = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.32, 0.9, 12), mats.travertineDark);
-  stem2.position.y = 2.45;
-  group.add(stem2);
-
-  const bowl2 = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.25, 0.28, 14), mats.travertine);
-  bowl2.position.y = 2.92;
-  group.add(bowl2);
-
-  const jet = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.85, 10), mats.waterTurquoise);
-  jet.position.y = 3.45;
-  group.add(jet);
+  // Graceful arching water stream arcs via TubeGeometry
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    const ca = Math.cos(a);
+    const sa = Math.sin(a);
+    const jetCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(ca * 0.12, 3.44, sa * 0.12),
+      new THREE.Vector3(ca * 0.65, 3.82, sa * 0.65),
+      new THREE.Vector3(ca * 1.15, 2.85, sa * 1.15),
+      new THREE.Vector3(ca * 1.55, 0.72, sa * 1.55),
+    ]);
+    const arcJet = new THREE.Mesh(
+      new THREE.TubeGeometry(jetCurve, 24, 0.045, 10, false),
+      mats.waterTurquoise
+    );
+    group.add(arcJet);
+  }
 
   enableShadows(group, true, true);
   addContactShadow(group, mats.contactShadow, 3.1, 3.1);

@@ -3,6 +3,7 @@ import { PlaceableType, RoadStyle } from '../types/sandbox';
 import { ProceduralTextureLibrary } from './textures';
 import { buildExtendedPlaceableAsset } from './modelsExtended';
 import { buildMiddleEarthAsset, MiddleEarthPlaceableType } from './middleEarthModels';
+import { buildSummerAsset, SummerPlaceableType } from './summerModels';
 
 export interface ColliderBoxDef {
   /** Local center relative to object bottom-center origin */
@@ -865,58 +866,90 @@ function buildRomanArch(mats: MaterialLibrary): BuiltAsset {
   };
 }
 
-/** 4. Ancient Fluted Roman Column */
+/** 4. Ancient Sculpted Fluted Roman Column (High-segment Lathe & Torus moldings) */
 function buildAncientColumn(mats: MaterialLibrary): BuiltAsset {
   const group = new THREE.Group();
 
-  const plinth1 = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.32, 1.65), mats.travertineDark);
-  plinth1.position.y = 0.16;
-  group.add(plinth1);
+  const marbleSculpt = new THREE.MeshStandardMaterial({
+    color: 0xebe3d3,
+    map: mats.travertine.map,
+    roughness: 0.68,
+    metalness: 0.3,
+    flatShading: false,
+  });
+  const marbleTrim = new THREE.MeshStandardMaterial({
+    color: 0xd9ceba,
+    map: mats.travertineDark.map,
+    roughness: 0.64,
+    metalness: 0.3,
+    flatShading: false,
+  });
 
-  const plinth2 = new THREE.Mesh(new THREE.BoxGeometry(1.32, 0.26, 1.32), mats.travertine);
-  plinth2.position.y = 0.45;
-  group.add(plinth2);
-
+  // Sculpted stepped Attic plinth & double-torus base via LatheGeometry
   const baseProfile = [
-    new THREE.Vector2(0.01, 0),
-    new THREE.Vector2(0.62, 0),
-    new THREE.Vector2(0.66, 0.14),
-    new THREE.Vector2(0.54, 0.26),
-    new THREE.Vector2(0.58, 0.38),
-    new THREE.Vector2(0.46, 0.48),
+    new THREE.Vector2(0.01, 0.0),
+    new THREE.Vector2(0.86, 0.0),
+    new THREE.Vector2(0.86, 0.24),
+    new THREE.Vector2(0.76, 0.32),
+    new THREE.Vector2(0.72, 0.48),
+    new THREE.Vector2(0.64, 0.56),
+    new THREE.Vector2(0.69, 0.68),
+    new THREE.Vector2(0.55, 0.8),
+    new THREE.Vector2(0.60, 0.92),
+    new THREE.Vector2(0.47, 1.04),
   ];
-  const atticBase = new THREE.Mesh(new THREE.LatheGeometry(baseProfile, 20), mats.travertine);
-  atticBase.position.y = 0.58;
+  const atticBase = new THREE.Mesh(new THREE.LatheGeometry(baseProfile, 36), marbleTrim);
   group.add(atticBase);
 
-  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.39, 0.46, 4.7, 16), mats.travertine);
-  shaft.position.y = 3.41;
+  // Classical entasis-curved column shaft (LatheGeometry with subtle swelling & graceful taper)
+  const shaftProfile = [
+    new THREE.Vector2(0.46, 1.02),
+    new THREE.Vector2(0.47, 1.65),
+    new THREE.Vector2(0.465, 2.55),
+    new THREE.Vector2(0.445, 3.65),
+    new THREE.Vector2(0.415, 4.75),
+    new THREE.Vector2(0.39, 5.65),
+    new THREE.Vector2(0.43, 5.74),
+    new THREE.Vector2(0.39, 5.8),
+  ];
+  const shaft = new THREE.Mesh(new THREE.LatheGeometry(shaftProfile, 36), marbleSculpt);
   group.add(shaft);
 
-  for (const ry of [2.4, 4.1]) {
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.43, 0.028, 8, 20), mats.travertineDark);
+  // Smooth decorative astragal collar rings
+  for (const ry of [2.4, 4.15, 5.66]) {
+    const r = ry > 5 ? 0.41 : 0.455;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(r, 0.032, 14, 32), marbleTrim);
     ring.rotation.x = Math.PI / 2;
     ring.position.y = ry;
     group.add(ring);
   }
 
-  const echinus = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.56, 0.38, 0.34, 16),
-    mats.travertineDark
-  );
-  echinus.position.y = 5.9;
-  group.add(echinus);
+  // Sculpted curved echinus capital & rounded abacus via LatheGeometry
+  const capitalProfile = [
+    new THREE.Vector2(0.39, 5.78),
+    new THREE.Vector2(0.48, 5.92),
+    new THREE.Vector2(0.62, 6.08),
+    new THREE.Vector2(0.74, 6.18),
+    new THREE.Vector2(0.76, 6.38),
+    new THREE.Vector2(0.68, 6.42),
+    new THREE.Vector2(0.01, 6.42),
+  ];
+  const capital = new THREE.Mesh(new THREE.LatheGeometry(capitalProfile, 36), marbleTrim);
+  group.add(capital);
 
-  for (const sx of [-0.52, 0.52]) {
-    const scroll = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.92, 12), mats.travertine);
+  // Ionic scrolled volute cushions (CapsuleGeometry + spiral Torus rings)
+  for (const sx of [-0.54, 0.54]) {
+    const scroll = new THREE.Mesh(new THREE.CapsuleGeometry(0.19, 0.56, 12, 24), marbleSculpt);
     scroll.rotation.x = Math.PI / 2;
     scroll.position.set(sx, 6.08, 0);
     group.add(scroll);
-  }
 
-  const abacus = new THREE.Mesh(new THREE.BoxGeometry(1.38, 0.24, 1.38), mats.travertineDark);
-  abacus.position.y = 6.28;
-  group.add(abacus);
+    for (const sz of [-0.39, 0.39]) {
+      const volute = new THREE.Mesh(new THREE.TorusGeometry(0.145, 0.035, 12, 24), marbleTrim);
+      volute.position.set(sx, 6.08, sz);
+      group.add(volute);
+    }
+  }
 
   enableShadows(group, true, true);
   addContactShadow(group, mats.contactShadow, 1.25, 1.25);
@@ -1125,9 +1158,27 @@ const MIDDLE_EARTH_TYPES = new Set<string>([
   'dragonStatue',
 ]);
 
+const SUMMER_TYPES = new Set<string>([
+  'seaWaterPatch',
+  'sandyBeachShore',
+  'beachVolleyball',
+  'summerVilla',
+  'beachBungalow',
+  'swimmingPool',
+  'woodenPier',
+  'beachCabanaSet',
+  'lifeguardTower',
+  'beachBarTiki',
+  'sailboatDocked',
+  'surfboardRack',
+]);
+
 export function buildPlaceableAsset(type: PlaceableType, mats: MaterialLibrary): BuiltAsset {
   if (MIDDLE_EARTH_TYPES.has(type)) {
     return buildMiddleEarthAsset(type as MiddleEarthPlaceableType, mats);
+  }
+  if (SUMMER_TYPES.has(type)) {
+    return buildSummerAsset(type as SummerPlaceableType, mats);
   }
 
   const extended = buildExtendedPlaceableAsset(type, mats);
@@ -1639,68 +1690,213 @@ export interface ExplorerRig {
 export function buildExplorerCharacter(mats: MaterialLibrary): ExplorerRig {
   const root = new THREE.Group();
 
-  const skinMat = new THREE.MeshStandardMaterial({ color: 0xe3b38e, roughness: 0.65 });
-  const jacketMat = new THREE.MeshStandardMaterial({ color: 0x2c4b5c, roughness: 0.78 });
-  const shirtMat = new THREE.MeshStandardMaterial({ color: 0xf0e8d8, roughness: 0.85 });
-  const pantsMat = new THREE.MeshStandardMaterial({ color: 0x2b2d34, roughness: 0.84 });
-  const hairMat = new THREE.MeshStandardMaterial({ color: 0x2a1d14, roughness: 0.82 });
-  const bootMat = new THREE.MeshStandardMaterial({ color: 0x4b2f1c, roughness: 0.72 });
+  const skinMat = new THREE.MeshStandardMaterial({
+    color: 0xe3b38e,
+    roughness: 0.7,
+    metalness: 0.03,
+    flatShading: false,
+  });
+  const jacketMat = new THREE.MeshStandardMaterial({
+    color: 0x2c4b5c,
+    roughness: 0.7,
+    metalness: 0.06,
+    flatShading: false,
+  });
+  const shirtMat = new THREE.MeshStandardMaterial({
+    color: 0xf0e8d8,
+    roughness: 0.72,
+    metalness: 0.03,
+    flatShading: false,
+  });
+  const pantsMat = new THREE.MeshStandardMaterial({
+    color: 0x2b2d34,
+    roughness: 0.72,
+    metalness: 0.04,
+    flatShading: false,
+  });
+  const hairMat = new THREE.MeshStandardMaterial({
+    color: 0x2a1d14,
+    roughness: 0.7,
+    metalness: 0.05,
+    flatShading: false,
+  });
+  const bootMat = new THREE.MeshStandardMaterial({
+    color: 0x4b2f1c,
+    roughness: 0.68,
+    metalness: 0.1,
+    flatShading: false,
+  });
+  const satchelMat = new THREE.MeshStandardMaterial({
+    color: 0x6b3e22,
+    roughness: 0.68,
+    metalness: 0.08,
+    flatShading: false,
+  });
+  const shadesMat = new THREE.MeshStandardMaterial({
+    color: 0x1b1e26,
+    roughness: 0.25,
+    metalness: 0.35,
+    flatShading: false,
+  });
 
   const torso = new THREE.Group();
   torso.position.y = 0.92;
   root.add(torso);
 
-  const chest = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.56, 0.26), jacketMat);
-  chest.position.y = 0.28;
+  // Smooth sculpted pelvis blending waist and hip joints seamlessly
+  const pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.21, 24, 18), pantsMat);
+  pelvis.scale.set(1.06, 0.72, 0.74);
+  pelvis.position.y = -0.02;
+  torso.add(pelvis);
+
+  // Contoured anatomical LatheGeometry Explorer Jacket Torso (zero BoxGeometry)
+  const chestProfile = [
+    new THREE.Vector2(0.005, -0.02),
+    new THREE.Vector2(0.198, 0.02),
+    new THREE.Vector2(0.192, 0.14),
+    new THREE.Vector2(0.212, 0.28),
+    new THREE.Vector2(0.244, 0.44),
+    new THREE.Vector2(0.228, 0.52),
+    new THREE.Vector2(0.162, 0.57),
+    new THREE.Vector2(0.095, 0.595),
+    new THREE.Vector2(0.005, 0.6),
+  ];
+  const chest = new THREE.Mesh(new THREE.LatheGeometry(chestProfile, 32), jacketMat);
+  chest.scale.set(1.04, 1.0, 0.7);
   torso.add(chest);
 
-  const collar = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.14, 0.27), shirtMat);
-  collar.position.set(0, 0.52, 0.01);
+  // Smooth contoured shirt collar & waist belt
+  const collar = new THREE.Mesh(new THREE.TorusGeometry(0.105, 0.036, 14, 28), shirtMat);
+  collar.rotation.x = Math.PI / 2;
+  collar.position.set(0, 0.565, 0.01);
   torso.add(collar);
 
-  const bag = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.24, 0.26), mats.carLeather);
-  bag.position.set(-0.26, 0.12, -0.02);
+  const belt = new THREE.Mesh(new THREE.TorusGeometry(0.198, 0.032, 12, 28), bootMat);
+  belt.rotation.x = Math.PI / 2;
+  belt.scale.set(1.06, 0.74, 1.0);
+  belt.position.y = 0.06;
+  torso.add(belt);
+
+  // Sculpted crossbody TubeGeometry strap + rounded CapsuleGeometry explorer satchel
+  const strapCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0.15, 0.56, 0.01),
+    new THREE.Vector3(0.03, 0.34, 0.168),
+    new THREE.Vector3(-0.24, 0.11, 0.02),
+    new THREE.Vector3(-0.04, 0.3, -0.158),
+    new THREE.Vector3(0.15, 0.56, 0.01),
+  ]);
+  const bagStrap = new THREE.Mesh(new THREE.TubeGeometry(strapCurve, 32, 0.018, 10, true), satchelMat);
+  torso.add(bagStrap);
+
+  const bag = new THREE.Mesh(new THREE.CapsuleGeometry(0.082, 0.12, 12, 20), satchelMat);
+  bag.scale.set(0.75, 1.0, 1.18);
+  bag.position.set(-0.255, 0.08, -0.01);
   torso.add(bag);
 
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.165, 14, 14), skinMat);
-  head.position.y = 0.72;
+  // Smooth neck + sculpted oval head + ears + nose
+  const neck = new THREE.Mesh(new THREE.CapsuleGeometry(0.064, 0.09, 10, 20), skinMat);
+  neck.position.y = 0.62;
+  torso.add(neck);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.162, 28, 22), skinMat);
+  head.scale.set(0.95, 1.07, 0.98);
+  head.position.y = 0.74;
   torso.add(head);
 
+  const nose = new THREE.Mesh(new THREE.CapsuleGeometry(0.016, 0.028, 8, 12), skinMat);
+  nose.position.set(0, 0.735, 0.156);
+  nose.rotation.x = -0.22;
+  torso.add(nose);
+
+  for (const sx of [-1, 1]) {
+    const ear = new THREE.Mesh(new THREE.SphereGeometry(0.028, 12, 10), skinMat);
+    ear.scale.set(0.55, 1.15, 0.8);
+    ear.position.set(sx * 0.152, 0.735, -0.005);
+    torso.add(ear);
+  }
+
+  // Sculpted layered hair dome + swept top wave
   const hair = new THREE.Mesh(
-    new THREE.SphereGeometry(0.175, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.58),
+    new THREE.SphereGeometry(0.174, 28, 20, 0, Math.PI * 2, 0, Math.PI * 0.6),
     hairMat
   );
-  hair.position.set(0, 0.74, -0.01);
+  hair.scale.set(0.98, 1.08, 1.02);
+  hair.position.set(0, 0.76, -0.012);
   torso.add(hair);
 
-  const shades = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.055, 0.06), mats.wroughtIron);
-  shades.position.set(0, 0.73, 0.145);
-  torso.add(shades);
+  // Sleek rounded aviator sunglasses (twin flattened spheres + curved metallic bridge)
+  for (const sx of [-0.056, 0.056]) {
+    const lens = new THREE.Mesh(new THREE.SphereGeometry(0.044, 16, 12), shadesMat);
+    lens.scale.set(1.18, 0.76, 0.42);
+    lens.position.set(sx, 0.752, 0.148);
+    torso.add(lens);
+  }
+  const shadesBridge = new THREE.Mesh(new THREE.CapsuleGeometry(0.009, 0.09, 6, 10), shadesMat);
+  shadesBridge.rotation.z = Math.PI / 2;
+  shadesBridge.position.set(0, 0.762, 0.154);
+  torso.add(shadesBridge);
 
+  // Smooth Articulated Arms (CapsuleGeometry + spherical shoulder/elbow joints)
   const makeArm = (x: number) => {
     const pivot = new THREE.Group();
-    pivot.position.set(x, 0.52, 0);
-    const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.44, 10), jacketMat);
-    sleeve.position.y = -0.22;
-    pivot.add(sleeve);
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), skinMat);
-    hand.position.y = -0.46;
+    pivot.position.set(x, 0.515, 0);
+
+    const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.07, 18, 14), jacketMat);
+    pivot.add(shoulder);
+
+    const upperArm = new THREE.Mesh(new THREE.CapsuleGeometry(0.058, 0.19, 10, 18), jacketMat);
+    upperArm.position.y = -0.145;
+    pivot.add(upperArm);
+
+    const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.054, 16, 12), jacketMat);
+    elbow.position.y = -0.27;
+    pivot.add(elbow);
+
+    const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.048, 0.16, 10, 18), jacketMat);
+    forearm.position.y = -0.38;
+    pivot.add(forearm);
+
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 14), skinMat);
+    hand.scale.set(0.88, 1.1, 0.78);
+    hand.position.y = -0.505;
     pivot.add(hand);
+
     torso.add(pivot);
     return pivot;
   };
-  const leftArm = makeArm(-0.3);
-  const rightArm = makeArm(0.3);
+  const leftArm = makeArm(-0.295);
+  const rightArm = makeArm(0.295);
 
+  // Smooth Articulated Legs (CapsuleGeometry thigh/calf + spherical joints + rounded boots)
   const makeLeg = (x: number) => {
     const pivot = new THREE.Group();
     pivot.position.set(x, 0.92, 0);
-    const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.072, 0.76, 10), pantsMat);
-    thigh.position.y = -0.38;
+
+    const hip = new THREE.Mesh(new THREE.SphereGeometry(0.084, 18, 14), pantsMat);
+    pivot.add(hip);
+
+    const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(0.076, 0.28, 10, 20), pantsMat);
+    thigh.position.y = -0.21;
     pivot.add(thigh);
-    const boot = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 0.24), bootMat);
-    boot.position.set(0, -0.84, 0.04);
-    pivot.add(boot);
+
+    const knee = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 14), pantsMat);
+    knee.position.y = -0.415;
+    pivot.add(knee);
+
+    const calf = new THREE.Mesh(new THREE.CapsuleGeometry(0.064, 0.27, 10, 20), pantsMat);
+    calf.position.y = -0.61;
+    pivot.add(calf);
+
+    const bootAnkle = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.075, 10, 18), bootMat);
+    bootAnkle.position.set(0, -0.785, 0);
+    pivot.add(bootAnkle);
+
+    const bootFoot = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.115, 10, 18), bootMat);
+    bootFoot.rotation.x = Math.PI / 2;
+    bootFoot.scale.set(1.05, 1.0, 0.85);
+    bootFoot.position.set(0, -0.855, 0.048);
+    pivot.add(bootFoot);
+
     root.add(pivot);
     return pivot;
   };

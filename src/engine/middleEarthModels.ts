@@ -570,50 +570,178 @@ function buildRuneMonolith(mats: MaterialLibrary): BuiltAsset {
   };
 }
 
-/** 10. Winged Dragon Guardian Monument Statue */
+/** 10. Winged Dragon Guardian Monument Statue (Sculpted Cast-Bronze & Turned Marble) */
 function buildDragonStatue(mats: MaterialLibrary): BuiltAsset {
   const group = new THREE.Group();
-  const bronze = makeMat({ color: 0x8a6d3b, roughness: 0.36, metalness: 0.78 });
+  const marblePedestal = makeMat({
+    color: 0xe6ded0,
+    map: mats.travertine.map,
+    roughness: 0.65,
+    metalness: 0.3,
+    flatShading: false,
+  });
+  const bronze = makeMat({
+    color: 0x9b7a44,
+    roughness: 0.58,
+    metalness: 0.35,
+    flatShading: false,
+  });
+  const bronzeAccent = makeMat({
+    color: 0xb99658,
+    roughness: 0.48,
+    metalness: 0.38,
+    flatShading: false,
+  });
 
-  // Stepped marble plinth
-  const base1 = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.45, 4.0), mats.travertine);
-  base1.position.y = 0.225;
-  group.add(base1);
-  const base2 = new THREE.Mesh(new THREE.BoxGeometry(2.7, 1.65, 2.7), mats.travertine);
-  base2.position.y = 1.25;
-  group.add(base2);
+  // Classical turned marble pedestal via high-segment LatheGeometry
+  const plinthProfile = [
+    new THREE.Vector2(0.01, 0.0),
+    new THREE.Vector2(2.15, 0.0),
+    new THREE.Vector2(2.12, 0.28),
+    new THREE.Vector2(1.88, 0.42),
+    new THREE.Vector2(1.62, 0.68),
+    new THREE.Vector2(1.42, 0.92),
+    new THREE.Vector2(1.36, 1.72),
+    new THREE.Vector2(1.58, 1.92),
+    new THREE.Vector2(1.68, 2.08),
+    new THREE.Vector2(1.52, 2.18),
+    new THREE.Vector2(0.01, 2.18),
+  ];
+  const pedestal = new THREE.Mesh(new THREE.LatheGeometry(plinthProfile, 40), marblePedestal);
+  group.add(pedestal);
 
-  // Stylized sculpted bronze dragon body, neck, head & spread wings
-  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.75, 2.0, 10), bronze);
-  torso.position.set(0, 3.05, -0.1);
+  // Decorative bronze torus ring crowning the pedestal
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.52, 0.08, 16, 40), bronzeAccent);
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = 2.04;
+  group.add(ring);
+
+  // Sculpted organic dragon torso via LatheGeometry (muscular chest tapering to waist)
+  const torsoProfile = [
+    new THREE.Vector2(0.01, 0.0),
+    new THREE.Vector2(0.56, 0.12),
+    new THREE.Vector2(0.68, 0.52),
+    new THREE.Vector2(0.58, 1.05),
+    new THREE.Vector2(0.46, 1.55),
+    new THREE.Vector2(0.32, 1.85),
+    new THREE.Vector2(0.01, 1.92),
+  ];
+  const torso = new THREE.Mesh(new THREE.LatheGeometry(torsoProfile, 28), bronze);
+  torso.position.set(0, 2.12, -0.15);
   torso.rotation.x = 0.28;
   group.add(torso);
 
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.42, 1.45, 8), bronze);
-  neck.position.set(0, 4.25, 0.45);
-  neck.rotation.x = 0.35;
+  // Graceful S-curved muscular dragon neck via TubeGeometry
+  const neckCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0, 3.65, 0.24),
+    new THREE.Vector3(0, 4.25, 0.52),
+    new THREE.Vector3(0, 4.78, 0.42),
+    new THREE.Vector3(0, 5.12, 0.72),
+  ]);
+  const neck = new THREE.Mesh(new THREE.TubeGeometry(neckCurve, 28, 0.25, 18, false), bronze);
   group.add(neck);
 
-  const head = new THREE.Mesh(new THREE.ConeGeometry(0.36, 1.15, 6), bronze);
-  head.rotation.x = Math.PI / 2 + 0.15;
-  head.position.set(0, 4.82, 1.05);
-  group.add(head);
+  // Sculpted Dragon Head (cranium sphere + tapered Capsule snout + twin curved horns)
+  const cranium = new THREE.Mesh(new THREE.SphereGeometry(0.34, 24, 18), bronze);
+  cranium.scale.set(0.92, 0.88, 1.12);
+  cranium.position.set(0, 5.15, 0.82);
+  group.add(cranium);
 
-  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.35, 2.2, 8), bronze);
-  tail.rotation.x = -Math.PI * 0.42;
-  tail.position.set(0, 2.35, -1.25);
-  group.add(tail);
+  const snout = new THREE.Mesh(new THREE.CapsuleGeometry(0.18, 0.52, 12, 20), bronze);
+  snout.rotation.x = Math.PI / 2 + 0.14;
+  snout.scale.set(1.0, 1.0, 0.76);
+  snout.position.set(0, 5.06, 1.24);
+  group.add(snout);
 
   for (const sx of [-1, 1]) {
-    const wing = new THREE.Mesh(new THREE.BoxGeometry(2.15, 1.45, 0.14), bronze);
-    wing.position.set(sx * 1.25, 3.95, -0.25);
-    wing.rotation.z = sx * 0.48;
-    wing.rotation.y = sx * -0.3;
-    group.add(wing);
+    const hornCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(sx * 0.18, 5.34, 0.76),
+      new THREE.Vector3(sx * 0.34, 5.64, 0.46),
+      new THREE.Vector3(sx * 0.44, 5.82, 0.08),
+    ]);
+    const horn = new THREE.Mesh(new THREE.TubeGeometry(hornCurve, 20, 0.058, 12, false), bronzeAccent);
+    group.add(horn);
+  }
+
+  // Sweeping coiled tail wrapping organically around the pedestal via TubeGeometry
+  const tailCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0, 2.38, -0.35),
+    new THREE.Vector3(-0.35, 2.15, -1.18),
+    new THREE.Vector3(-1.12, 2.08, -0.95),
+    new THREE.Vector3(-1.32, 2.12, 0.12),
+    new THREE.Vector3(-0.92, 2.24, 0.96),
+  ]);
+  const tail = new THREE.Mesh(new THREE.TubeGeometry(tailCurve, 36, 0.19, 16, false), bronze);
+  group.add(tail);
+
+  const tailTip = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.24, 10, 16), bronzeAccent);
+  tailTip.position.set(-0.82, 2.3, 1.08);
+  tailTip.rotation.z = -0.6;
+  group.add(tailTip);
+
+  // Muscular crouched haunches & front forelegs gripping the plinth
+  for (const sx of [-1, 1]) {
+    const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.28, 18, 14), bronze);
+    shoulder.position.set(sx * 0.52, 3.35, 0.24);
+    group.add(shoulder);
+
+    const foreleg = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.85, 10, 18), bronze);
+    foreleg.position.set(sx * 0.62, 2.75, 0.42);
+    foreleg.rotation.z = sx * 0.18;
+    group.add(foreleg);
+
+    const claw = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 12), bronzeAccent);
+    claw.scale.set(1.1, 0.55, 1.35);
+    claw.position.set(sx * 0.68, 2.22, 0.55);
+    group.add(claw);
+  }
+
+  // Sculpted Sweeping Wing Arms (TubeGeometry) + curved organic Wing Membranes (ExtrudeGeometry)
+  const wingShape = new THREE.Shape();
+  wingShape.moveTo(0, 0);
+  wingShape.quadraticCurveTo(0.85, 1.25, 2.15, 1.35);
+  wingShape.quadraticCurveTo(1.75, 0.42, 1.95, -0.45);
+  wingShape.quadraticCurveTo(1.25, -0.18, 0.92, -0.58);
+  wingShape.quadraticCurveTo(0.45, -0.22, 0, -0.48);
+  wingShape.closePath();
+
+  const wingGeo = new THREE.ExtrudeGeometry(wingShape, {
+    depth: 0.06,
+    bevelEnabled: true,
+    bevelThickness: 0.035,
+    bevelSize: 0.03,
+    bevelSegments: 4,
+    curveSegments: 16,
+  });
+
+  for (const sx of [-1, 1]) {
+    const wingGroup = new THREE.Group();
+    wingGroup.position.set(sx * 0.36, 3.65, -0.05);
+    wingGroup.rotation.y = sx * -0.42;
+    wingGroup.rotation.z = sx * 0.14;
+    if (sx === -1) {
+      wingGroup.scale.x = -1;
+    }
+
+    const membrane = new THREE.Mesh(wingGeo, bronze);
+    wingGroup.add(membrane);
+
+    const wingBoneCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, 0.02, 0.03),
+      new THREE.Vector3(0.82, 0.96, 0.03),
+      new THREE.Vector3(2.12, 1.34, 0.03),
+    ]);
+    const wingBone = new THREE.Mesh(
+      new THREE.TubeGeometry(wingBoneCurve, 22, 0.082, 12, false),
+      bronzeAccent
+    );
+    wingGroup.add(wingBone);
+
+    group.add(wingGroup);
   }
 
   addShadows(group);
-  const colliders: ColliderBoxDef[] = [{ size: [4.0, 5.0, 4.0], offset: [0, 2.5, 0] }];
+  const colliders: ColliderBoxDef[] = [{ size: [4.0, 5.4, 4.0], offset: [0, 2.7, 0] }];
   return {
     group,
     colliders,

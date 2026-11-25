@@ -11,11 +11,12 @@ export type RoadStyle =
 
 export type PaletteCategory =
   | 'roads'
+  | 'vehicles'
+  | 'summer'
+  | 'middleEarth'
   | 'buildings'
   | 'bazaar'
   | 'ancient'
-  | 'middleEarth'
-  | 'vehicles'
   | 'leisure'
   | 'nature'
   | 'lighting'
@@ -154,7 +155,20 @@ export type PlaceableType =
   | 'windmillTower'
   | 'beaconTower'
   | 'runeMonolith'
-  | 'dragonStatue';
+  | 'dragonStatue'
+  // Yaz & Plaj Konsepti
+  | 'seaWaterPatch'
+  | 'sandyBeachShore'
+  | 'beachVolleyball'
+  | 'summerVilla'
+  | 'beachBungalow'
+  | 'swimmingPool'
+  | 'woodenPier'
+  | 'beachCabanaSet'
+  | 'lifeguardTower'
+  | 'beachBarTiki'
+  | 'sailboatDocked'
+  | 'surfboardRack';
 
 export type ActiveTool =
   | { kind: 'select' }
@@ -247,6 +261,74 @@ export interface EngineSnapshot {
   pointerLocked: boolean;
 }
 
+export interface MinimapObjectItem {
+  id: string;
+  type: PlaceableType;
+  name: string;
+  category: Exclude<PaletteCategory, 'roads' | 'npcs' | 'vehicles'>;
+  x: number;
+  z: number;
+  rotationY: number;
+  scale: number;
+  radius: number;
+}
+
+export interface MinimapRoadItem {
+  id: string;
+  style: RoadStyle;
+  width: number;
+  points: [number, number][];
+}
+
+export interface MinimapVehicleItem {
+  id: string;
+  type: VehicleType;
+  name: string;
+  isFlying: boolean;
+  x: number;
+  z: number;
+  yaw: number;
+  isActive: boolean;
+}
+
+export interface MinimapNpcItem {
+  id: string;
+  name: string;
+  roleTitle: string;
+  primaryColor: string;
+  x: number;
+  z: number;
+  hasQuest: boolean;
+  questStatus?: QuestStatus;
+}
+
+export interface MinimapQuestTarget {
+  npcId: string;
+  npcName: string;
+  x: number;
+  z: number;
+}
+
+export interface MinimapState {
+  mode: AppMode;
+  actorX: number;
+  actorZ: number;
+  actorHeadingX: number;
+  actorHeadingZ: number;
+  camHeadingX: number;
+  camHeadingZ: number;
+  playerX: number;
+  playerZ: number;
+  inVehicle: boolean;
+  activeVehicleIsFlying: boolean;
+  selectedId: string | null;
+  roads: MinimapRoadItem[];
+  objects: MinimapObjectItem[];
+  vehicles: MinimapVehicleItem[];
+  npcs: MinimapNpcItem[];
+  questTargets: MinimapQuestTarget[];
+}
+
 export interface RoadCatalogItem {
   style: RoadStyle;
   name: string;
@@ -273,6 +355,7 @@ export interface CatalogItem {
 export const PALETTE_CATEGORIES: { id: PaletteCategory; label: string }[] = [
   { id: 'roads', label: 'Yollar' },
   { id: 'vehicles', label: 'Araçlar' },
+  { id: 'summer', label: 'Yaz & Plaj' },
   { id: 'middleEarth', label: 'Orta Dünya' },
   { id: 'buildings', label: 'Bina & Ev' },
   { id: 'bazaar', label: 'Çarşı' },
@@ -639,6 +722,20 @@ export const PLACEABLE_CATALOG: CatalogItem[] = [
   { type: 'beaconTower', name: 'İşaret Ateşi Kulesi', category: 'middleEarth', footprintLabel: '5 × 5 m', defaultScale: 1 },
   { type: 'runeMonolith', name: 'Kadim Rün Dikilitaşı', category: 'middleEarth', footprintLabel: '5.5 × 5.5 m', defaultScale: 1 },
   { type: 'dragonStatue', name: 'Ejderha Muhafız Anıtı', category: 'middleEarth', footprintLabel: '4.5 × 4.5 m', defaultScale: 1 },
+
+  // Yaz & Plaj Konsepti
+  { type: 'seaWaterPatch', name: 'Turkuaz Deniz Parçası', category: 'summer', footprintLabel: '20 × 20 m', defaultScale: 1 },
+  { type: 'sandyBeachShore', name: 'Kumsal & Dalga Kıyısı', category: 'summer', footprintLabel: '16 × 14 m', defaultScale: 1 },
+  { type: 'beachVolleyball', name: 'Plaj Voleybolu Sahası', category: 'summer', footprintLabel: '16 × 9 m', defaultScale: 1 },
+  { type: 'summerVilla', name: 'Havuzlu Beyaz Yazlık', category: 'summer', footprintLabel: '12 × 10 m', defaultScale: 1 },
+  { type: 'beachBungalow', name: 'Ahşap Plaj Bungalovu', category: 'summer', footprintLabel: '7 × 6.5 m', defaultScale: 1 },
+  { type: 'swimmingPool', name: 'Yüzme Havuzu & Teras', category: 'summer', footprintLabel: '11 × 8 m', defaultScale: 1 },
+  { type: 'woodenPier', name: 'Ahşap Deniz İskelesi', category: 'summer', footprintLabel: '14 × 4.5 m', defaultScale: 1 },
+  { type: 'beachCabanaSet', name: 'Şezlong & Şemsiye Seti', category: 'summer', footprintLabel: '6 × 4.5 m', defaultScale: 1 },
+  { type: 'lifeguardTower', name: 'Cankurtaran Kulesi', category: 'summer', footprintLabel: '4 × 4 m', defaultScale: 1 },
+  { type: 'beachBarTiki', name: 'Sahil Tiki Bar & Dondurma', category: 'summer', footprintLabel: '6.5 × 5 m', defaultScale: 1 },
+  { type: 'sailboatDocked', name: 'Yelkenli Tekne & Yat', category: 'summer', footprintLabel: '8.5 × 3.5 m', defaultScale: 1 },
+  { type: 'surfboardRack', name: 'Sörf & Kano İstasyonu', category: 'summer', footprintLabel: '5 × 2.8 m', defaultScale: 1 },
 ];
 
 export const PLACEABLE_LABELS: Record<PlaceableType, string> = Object.fromEntries(
@@ -769,6 +866,20 @@ export function createDefaultDemoMap(): MapDocument {
       { id: 'obj-wizard-1', type: 'wizardTower', position: [-34, 0, -24], rotationY: deg(25), scale: 1 },
       { id: 'obj-elven-1', type: 'elvenPavilion', position: [14, 0, 34], rotationY: deg(-40), scale: 1 },
       { id: 'obj-beacon-1', type: 'beaconTower', position: [-2, 0, -37], rotationY: 0, scale: 1 },
+
+      // Summer Beach & Aegean Cove Quarter (East Coast)
+      { id: 'obj-sea-1', type: 'seaWaterPatch', position: [57, 0, 14], rotationY: 0, scale: 1 },
+      { id: 'obj-sea-2', type: 'seaWaterPatch', position: [57, 0, -6], rotationY: 0, scale: 1 },
+      { id: 'obj-beach-1', type: 'sandyBeachShore', position: [41, 0, 14], rotationY: 0, scale: 1 },
+      { id: 'obj-beach-2', type: 'sandyBeachShore', position: [41, 0, 0], rotationY: 0, scale: 1 },
+      { id: 'obj-pier-1', type: 'woodenPier', position: [49.5, 0, 5.5], rotationY: 0, scale: 1 },
+      { id: 'obj-sailboat-1', type: 'sailboatDocked', position: [57.5, 0, 11.5], rotationY: deg(-25), scale: 1 },
+      { id: 'obj-volley-1', type: 'beachVolleyball', position: [38.5, 0, 22], rotationY: deg(90), scale: 0.9 },
+      { id: 'obj-summer-villa-1', type: 'summerVilla', position: [29, 0, 32], rotationY: deg(120), scale: 1 },
+      { id: 'obj-cabana-1', type: 'beachCabanaSet', position: [40.5, 0, 11.5], rotationY: deg(90), scale: 1 },
+      { id: 'obj-lifeguard-1', type: 'lifeguardTower', position: [41.5, 0, -4.5], rotationY: deg(90), scale: 1 },
+      { id: 'obj-tikibar-1', type: 'beachBarTiki', position: [33.5, 0, 12], rotationY: deg(90), scale: 1 },
+      { id: 'obj-surf-1', type: 'surfboardRack', position: [41.5, 0, 1.2], rotationY: deg(90), scale: 1 },
     ],
     vehicles: [
       { id: 'veh-classic-1', type: 'classicCar', position: [12, 0, 12.2], rotationY: deg(-80) },

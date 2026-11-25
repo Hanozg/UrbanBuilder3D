@@ -8,6 +8,12 @@ import {
   createDefaultDemoMap,
   EngineSnapshot,
   MapDocument,
+  MinimapNpcItem,
+  MinimapObjectItem,
+  MinimapQuestTarget,
+  MinimapRoadItem,
+  MinimapState,
+  MinimapVehicleItem,
   NPC_PRESET_TEMPLATES,
   NpcData,
   NpcGender,
@@ -16,6 +22,7 @@ import {
   NpcRelationData,
   NpcRelationType,
   NpcTemplate,
+  PLACEABLE_CATALOG,
   PLACEABLE_LABELS,
   PlaceableType,
   PlacedObjectData,
@@ -827,6 +834,218 @@ export class SandboxEngine {
     this.currentCamPos.copy(this.editorPos);
     this.camera.position.copy(this.editorPos);
     this.camera.lookAt(nx, ny + 1.1, nz);
+  }
+
+  public getMinimapState(): MinimapState {
+    const activeVeh = this.getActiveVehicle();
+    const roads: MinimapRoadItem[] = [];
+    for (const road of this.roads.values()) {
+      roads.push({
+        id: road.data.id,
+        style: road.data.style,
+        width: road.data.width,
+        points: road.data.points,
+      });
+    }
+
+    const objects: MinimapObjectItem[] = [];
+    for (const obj of this.placedObjects.values()) {
+      const meta = PLACEABLE_CATALOG.find((c) => c.type === obj.data.type);
+      objects.push({
+        id: obj.data.id,
+        type: obj.data.type,
+        name: PLACEABLE_LABELS[obj.data.type] || obj.data.type,
+        category: meta?.category ?? 'buildings',
+        x: obj.data.position[0],
+        z: obj.data.position[2],
+        rotationY: obj.data.rotationY,
+        scale: obj.data.scale,
+        radius: obj.selectionRadius,
+      });
+    }
+
+    const vehicles: MinimapVehicleItem[] = [];
+    for (const veh of this.vehicles.values()) {
+      vehicles.push({
+        id: veh.data.id,
+        type: veh.data.type,
+        name: VEHICLE_LABELS[veh.data.type] || veh.data.type,
+        isFlying: veh.rig.isFlying,
+        x: veh.body.position.x,
+        z: veh.body.position.z,
+        yaw: veh.yaw,
+        isActive: this.inVehicle && this.activeVehicleId === veh.data.id,
+      });
+    }
+
+    const npcs: MinimapNpcItem[] = [];
+    for (const npc of this.npcs.values()) {
+      const qState = this.questStates.get(npc.data.id);
+      npcs.push({
+        id: npc.data.id,
+        name: npc.data.name,
+        roleTitle: npc.data.roleTitle,
+        primaryColor: npc.data.primaryColor,
+        x: npc.data.position[0],
+        z: npc.data.position[2],
+        hasQuest: npc.data.quest.enabled,
+        questStatus: qState?.status,
+      });
+    }
+
+    const questTargets: MinimapQuestTarget[] = [];
+    for (const [npcId, beacon] of this.questBeacons.entries()) {
+      const npc = this.npcs.get(npcId);
+      questTargets.push({
+        npcId,
+        npcName: npc?.data.name ?? 'Görev',
+        x: beacon.target[0],
+        z: beacon.target[1],
+      });
+    }
+
+    let actorX = this.editorPos.x;
+    let actorZ = this.editorPos.z;
+    let actorHeadingX = -Math.sin(this.editorYaw);
+    let actorHeadingZ = -Math.cos(this.editorYaw);
+    let camHeadingX = actorHeadingX;
+    let camHeadingZ = actorHeadingZ;
+
+    if (this.mode === 'play') {
+      if (this.inVehicle && activeVeh) {
+        actorX = activeVeh.body.position.x;
+        actorZ = activeVeh.body.position.z;
+        actorHeadingX = Math.sin(activeVeh.yaw);
+        actorHeadingZ = Math.cos(activeVeh.yaw);
+        camHeadingX = actorHeadingX;
+        camHeadingZ = actorHeadingZ;
+      } else {
+        actorX = this.playerBody.position.x;
+        actorZ = this.playerBody.position.z;
+        actorHeadingX = Math.sin(this.playerYaw);
+        actorHeadingZ = Math.cos(this.playerYaw);
+        camHeadingX = -Math.sin(this.playCamYaw);
+        camHeadingZ = -Math.cos(this.playCamYaw);
+      }
+    }
+
+    return {
+      mode: this.mode,
+      actorX,
+      actorZ,
+      actorHeadingX,
+      actorHeadingZ,
+      camHeadingX,
+      camHeadingZ,
+      playerX: this.playerBody.position.x,
+      playerZ: this.playerBody.position.z,
+      inVehicle: this.inVehicle,
+      activeVehicleIsFlying: Boolean(this.inVehicle && activeVeh?.rig.isFlying),
+      selectedId: this.selected?.id ?? null,
+      roads,
+      objects,
+      vehicles,
+      npcs,
+      questTargets,
+    };
+  }
+
+  public navigateToWorldPoint(x: number, z: number, label?: string) {
+    const cx = THREE.MathUtils.clamp(x, -90, 90);
+    const cz = THREE.MathUtils.clamp(z, -90, 90);
+
+    if (this.mode === 'editor') {
+      const camX = cx + 12;
+      const camY = 18;
+      const camZ = cz + 14;
+      this.editorPos.set(camX, camY, camZ);
+      const dx = cx - camX;
+      const dy = 1.2 - camY;
+      const dz = cz - camZ;
+      const horiz = Math.hypot(dx, dz);
+      this.editorYaw = Math.atan2(-dx, -dz);
+      this.editorPitch = Math.atan2(dy, horiz);
+      this.currentCamPos.copy(this.editorPos);
+      this.camera.position.copy(this.editorPos);
+      this.camera.lookAt(cx, 1.2, cz);
+      if (label) {
+        this.callbacks.onToast(`Kamera odaklandı: ${label}`, 'info');
+      }
+      return;
+    }
+
+    // Play Mode fast travel
+    const activeVeh = this.getActiveVehicle();
+    if (this.inVehicle && activeVeh) {
+      const targetY = activeVeh.rig.isFlying
+        ? Math.max(activeVeh.body.position.y, 4.5)
+        : 0.45;
+      activeVeh.body.position.set(cx, targetY, cz);
+      activeVeh.body.velocity.set(0, 0, 0);
+      activeVeh.body.angularVelocity.set(0, 0, 0);
+      activeVeh.speed = 0;
+      activeVeh.verticalSpeed = 0;
+      activeVeh.rig.root.position.set(cx, targetY, cz);
+      activeVeh.data.position = [cx, targetY, cz];
+    } else {
+      this.playerBody.position.set(cx, 1.2, cz);
+      this.playerBody.velocity.set(0, 0, 0);
+      this.explorer.root.position.set(cx, 0, cz);
+    }
+    this.callbacks.onToast(
+      label ? `Hızlı yolculuk: ${label}` : `Konuma gidildi (${Math.round(cx)}, ${Math.round(cz)})`,
+      'success'
+    );
+  }
+
+  public focusEntityFromMinimap(kind: 'npc' | 'vehicle' | 'object', id: string) {
+    if (kind === 'npc') {
+      const npc = this.npcs.get(id);
+      if (!npc) return;
+      if (this.mode === 'editor') {
+        this.focusCameraOnNpc(id);
+        this.callbacks.onToast(`NPC seçildi: ${npc.data.name}`, 'info');
+      } else {
+        this.navigateToWorldPoint(npc.data.position[0] + 2.4, npc.data.position[2] + 2.4, npc.data.name);
+      }
+      return;
+    }
+
+    if (kind === 'vehicle') {
+      const veh = this.vehicles.get(id);
+      if (!veh) return;
+      const name = VEHICLE_LABELS[veh.data.type] || veh.data.type;
+      if (this.mode === 'editor') {
+        this.activeTool = { kind: 'select' };
+        this.rebuildGhostPreview();
+        this.roadCursorRing.visible = false;
+        this.selected = { kind: 'vehicle', id };
+        this.isMovingSelected = false;
+        this.updateSelectionRing();
+        this.emitSnapshot();
+        this.navigateToWorldPoint(veh.body.position.x, veh.body.position.z, name);
+      } else {
+        this.navigateToWorldPoint(veh.body.position.x + 3.2, veh.body.position.z + 3.2, name);
+      }
+      return;
+    }
+
+    const obj = this.placedObjects.get(id);
+    if (!obj) return;
+    const label = PLACEABLE_LABELS[obj.data.type] || obj.data.type;
+    if (this.mode === 'editor') {
+      this.activeTool = { kind: 'select' };
+      this.rebuildGhostPreview();
+      this.roadCursorRing.visible = false;
+      this.selected = { kind: 'object', id };
+      this.isMovingSelected = false;
+      this.updateSelectionRing();
+      this.emitSnapshot();
+      this.navigateToWorldPoint(obj.data.position[0], obj.data.position[2], label);
+    } else {
+      const offset = Math.min(Math.max(obj.selectionRadius * 0.85, 3.2), 9);
+      this.navigateToWorldPoint(obj.data.position[0] + offset, obj.data.position[2] + offset, label);
+    }
   }
 
   public addNpcRelation(
@@ -3107,11 +3326,34 @@ export class SandboxEngine {
     this.npcAnimTime += dt;
     const t = this.npcAnimTime;
 
-    // Animate windmill sails & idle flying vehicle propellers even in Editor Mode
+    // Animate windmill sails, bobbing sailboats/buoys, shore foam waves & water caustics
+    let scrolledSeaTex = false;
     for (const obj of this.placedObjects.values()) {
       for (const child of obj.group.children) {
         if (child.userData.spinZ) {
           child.rotation.z -= dt * 0.85;
+        }
+        if (child.userData.bobY) {
+          const baseY = (child.userData.bobBaseY as number) ?? 0.2;
+          const phase = (child.userData.bobPhase as number) ?? 0;
+          child.position.y = baseY + Math.sin(t * 1.9 + phase) * 0.065;
+          child.rotation.z = Math.sin(t * 1.35 + phase) * 0.032;
+        }
+        if (child.userData.waveFoam) {
+          const phase = (child.userData.wavePhase as number) ?? 0;
+          if (typeof child.userData.waveBaseX === 'number') {
+            child.position.x = child.userData.waveBaseX + Math.sin(t * 1.45 + phase) * 0.42;
+          } else if (typeof child.userData.waveBaseZ === 'number') {
+            child.position.z = child.userData.waveBaseZ + Math.sin(t * 1.2 + phase) * 0.45;
+          }
+        }
+        if (child.userData.waterUvScroll && !scrolledSeaTex && child instanceof THREE.Mesh) {
+          const mat = child.material as THREE.MeshStandardMaterial;
+          if (mat.map) {
+            mat.map.offset.x = (t * 0.035) % 1;
+            mat.map.offset.y = (t * 0.022) % 1;
+            scrolledSeaTex = true;
+          }
         }
       }
     }
