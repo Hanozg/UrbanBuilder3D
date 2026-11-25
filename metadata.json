@@ -1,0 +1,6 @@
+{
+  "name": "Agora Studio — 3D Şehir & Antik Kent İnşa Motoru",
+  "description": "Three.js ve Cannon-es fizik motoru ile tarayıcıda çalışan 3D Sandbox Şehir ve Antik Kent inşa, keşif ve sürüş motoru.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
