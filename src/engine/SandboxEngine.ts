@@ -51,6 +51,7 @@ import {
 } from './models';
 import { buildNpcCharacter, buildQuestBeaconMesh, NpcRig } from './npcModels';
 import { buildVehicleRig, VehicleRig } from './vehicleModels';
+import { GroundSurfaceKind, ProceduralSoundEngine } from './soundEngine';
 
 interface RuntimeObject {
   data: PlacedObjectData;
@@ -260,8 +261,12 @@ export class SandboxEngine {
   private playerBody: CANNON.Body;
   private playerYaw = Math.PI;
   private walkCycle = 0;
+  private lastStepCount = 0;
   private isGrounded = true;
   private jumpCooldown = 0;
+  private sound = new ProceduralSoundEngine();
+  private lastVehicleThrottle = 0;
+  private lastVehicleHandbrake = false;
 
   private activeVehicleId: string | null = null;
   private nearVehicleId: string | null = null;
@@ -300,6 +305,7 @@ export class SandboxEngine {
 
   // Input State
   private keys = new Set<string>();
+  private keysLower = new Set<string>();
   private isRightMouseDown = false;
   private isLeftDraggingPlay = false;
   private lastPointerX = 0;
@@ -337,6 +343,8 @@ export class SandboxEngine {
       container.clientWidth || window.innerWidth,
       container.clientHeight || window.innerHeight
     );
+    this.renderer.domElement.tabIndex = 0;
+    this.renderer.domElement.style.outline = 'none';
     container.appendChild(this.renderer.domElement);
 
     // 2. Scene & Environment
@@ -665,6 +673,7 @@ export class SandboxEngine {
 
   public setMode(nextMode: AppMode) {
     if (this.mode === nextMode) return;
+    this.sound.unlock();
     this.mode = nextMode;
     this.cancelRoadDraft();
     this.isMovingSelected = false;
@@ -678,13 +687,21 @@ export class SandboxEngine {
       this.selected = null;
 
       if (!this.inVehicle) {
+        this.restorePlayerDynamicBody();
         this.playerBody.velocity.set(0, 0, 0);
-        if (this.playerBody.position.y < 0.05 || this.playerBody.position.y > 10) {
-          this.playerBody.position.set(1.5, 0.2, 12);
+        if (
+          !Number.isFinite(this.playerBody.position.y) ||
+          this.playerBody.position.y < -1 ||
+          this.playerBody.position.y > 30
+        ) {
+          this.playerBody.position.set(7.8, 0.2, 13.7);
         }
       }
+      (document.activeElement as HTMLElement | null)?.blur?.();
+      this.renderer.domElement.focus({ preventScroll: true });
       this.currentCamPos.copy(this.camera.position);
-      this.callbacks.onToast('Oynanış Modu — WASD ile keşfedin, klasik aracın yanında E ile binin.', 'info');
+      this.sound.playModeSwitch(true);
+      this.callbacks.onToast('Oynanış Modu — WASD ile yürüyün, Shift ile koşun, aracın yanında E ile binin.', 'info');
     } else {
       if (document.pointerLockElement === this.renderer.domElement) {
         document.exitPointerLock?.();
@@ -703,6 +720,7 @@ export class SandboxEngine {
       this.editorPitch = -0.48;
       this.camera.fov = 56;
       this.camera.updateProjectionMatrix();
+      this.sound.playModeSwitch(false);
       this.callbacks.onToast('İnşa Modu — Sol paletten yol veya modüler yapı seçin.', 'info');
     }
 
@@ -713,8 +731,19 @@ export class SandboxEngine {
     this.setMode(this.mode === 'editor' ? 'play' : 'editor');
   }
 
+  public toggleAudioMute(): boolean {
+    const muted = this.sound.toggleMute();
+    if (!muted) {
+      this.sound.playUiTick(680);
+    }
+    this.emitSnapshot();
+    return muted;
+  }
+
   public setTimeOfDay(tod: TimeOfDay) {
+    this.sound.unlock();
     this.timeOfDay = tod;
+    this.sound.playUiTick(tod === 'night' ? 440 : tod === 'noon' ? 740 : 580);
     this.emitSnapshot();
   }
 
@@ -988,7 +1017,8 @@ export class SandboxEngine {
       activeVeh.rig.root.position.set(cx, targetY, cz);
       activeVeh.data.position = [cx, targetY, cz];
     } else {
-      this.playerBody.position.set(cx, 1.2, cz);
+      this.restorePlayerDynamicBody();
+      this.playerBody.position.set(cx, 0.35, cz);
       this.playerBody.velocity.set(0, 0, 0);
       this.explorer.root.position.set(cx, 0, cz);
     }
@@ -1197,6 +1227,7 @@ export class SandboxEngine {
       this.removeQuestBeacon(npcId);
     }
 
+    this.sound.playQuestFanfare(false);
     this.callbacks.onToast(
       initialStatus === 'ready'
         ? `Görev kabul edildi: "${q.title}" — Ödülü hemen alabilirsiniz!`
@@ -1230,6 +1261,7 @@ export class SandboxEngine {
     if (state.quest.rewardXp > 0) parts.push(`+${state.quest.rewardXp} XP`);
     if (state.quest.rewardItem?.trim()) parts.push(state.quest.rewardItem.trim());
 
+    this.sound.playQuestFanfare(true);
     this.callbacks.onToast(
       `Görev Tamamlandı: "${state.quest.title}" (${parts.join(' · ')})`,
       'success'
@@ -1241,11 +1273,13 @@ export class SandboxEngine {
     if (this.mode !== 'play' || this.inVehicle || !this.nearNpcId) return;
     const npc = this.npcs.get(this.nearNpcId);
     if (npc) {
+      this.sound.playNpcGreet();
       this.callbacks.onInteractNpc?.(npc.data);
     }
   }
 
   public rotatePlacement(deltaDeg = 15) {
+    this.sound.playUiTick(540);
     if (this.activeTool.kind === 'select' && this.selected?.kind === 'object') {
       const runtime = this.placedObjects.get(this.selected.id);
       if (runtime) {
@@ -1375,6 +1409,7 @@ export class SandboxEngine {
     this.isMovingSelected = false;
     this.selectionRing.visible = false;
     this.clearSelectedRoadHighlight();
+    this.sound.playDelete();
     this.emitSnapshot();
   }
 
@@ -1396,6 +1431,7 @@ export class SandboxEngine {
     };
     this.addRoadEntity(roadData);
     this.cancelRoadDraft();
+    this.sound.playRoadCommit();
     this.callbacks.onToast(`${ROAD_STYLE_LABELS[style]} oluşturuldu.`, 'success');
     this.emitSnapshot();
   }
@@ -1673,6 +1709,7 @@ export class SandboxEngine {
     cancelAnimationFrame(this.frameId);
     clearTimeout(this.frameId);
     this.unbindEvents();
+    this.sound.dispose();
 
     this.clearSceneEntities();
     this.clearRoadPreview();
@@ -1790,8 +1827,9 @@ export class SandboxEngine {
     }
 
     const [cx, , cz] = doc.carTransform.position;
+    this.restorePlayerDynamicBody();
     this.playerBody.velocity.set(0, 0, 0);
-    this.playerBody.position.set(cx - 4.2, 0.25, cz + 1.5);
+    this.playerBody.position.set(cx - 4.2, 0.15, cz + 1.5);
     this.explorer.root.position.set(cx - 4.2, 0, cz + 1.5);
 
     if (!initial) {
@@ -1909,37 +1947,10 @@ export class SandboxEngine {
     runtime.body.quaternion.setFromEuler(0, runtime.data.rotationY, 0);
   }
 
-  private buildRoadPhysicsBodies(data: RoadData): CANNON.Body[] {
-    const bodies: CANNON.Body[] = [];
-    const vecPoints = data.points.map(([x, z]) => new THREE.Vector3(x, 0, z));
-    if (vecPoints.length >= 2) {
-      const curve = new THREE.CatmullRomCurve3(vecPoints, false, 'centripetal', 0.5);
-      const len = curve.getLength();
-      const segs = Math.max(4, Math.min(48, Math.ceil(len / 3.5)));
-      const pts = curve.getSpacedPoints(segs);
-      const totalWidth = getRoadTotalWidth(data.style, data.width);
-
-      for (let i = 0; i < pts.length - 1; i++) {
-        const a = pts[i];
-        const b = pts[i + 1];
-        const segLen = a.distanceTo(b);
-        if (segLen < 0.1) continue;
-        const midX = (a.x + b.x) * 0.5;
-        const midZ = (a.z + b.z) * 0.5;
-        const angle = Math.atan2(b.x - a.x, b.z - a.z);
-
-        const roadBody = new CANNON.Body({
-          mass: 0,
-          material: this.groundPhysMat,
-        });
-        roadBody.addShape(new CANNON.Box(new CANNON.Vec3(totalWidth * 0.5, 0.03, segLen * 0.54)));
-        roadBody.position.set(midX, -0.01, midZ);
-        roadBody.quaternion.setFromEuler(0, angle, 0);
-        this.world.addBody(roadBody);
-        bodies.push(roadBody);
-      }
-    }
-    return bodies;
+  private buildRoadPhysicsBodies(_data: RoadData): CANNON.Body[] {
+    // Roads rest flush on the continuous y = 0 terrain plane; skipping overlapping box segments
+    // prevents 3cm seam edges from snagging walking character spheres or vehicle wheels.
+    return [];
   }
 
   private addRoadEntity(data: RoadData): RuntimeRoad {
@@ -2354,23 +2365,33 @@ export class SandboxEngine {
     }
   }
 
+  private restorePlayerDynamicBody() {
+    this.playerBody.type = CANNON.Body.DYNAMIC;
+    this.playerBody.mass = 72;
+    this.playerBody.updateMassProperties();
+    this.playerBody.collisionResponse = true;
+    this.playerBody.wakeUp();
+  }
+
   private enterVehicle(vehicleId: string) {
     const veh = this.vehicles.get(vehicleId);
     if (!veh) return;
     this.activeVehicleId = vehicleId;
     this.inVehicle = true;
     this.playerBody.collisionResponse = false;
+    this.playerBody.type = CANNON.Body.KINEMATIC;
     this.playerBody.mass = 0;
     this.playerBody.updateMassProperties();
     this.playerBody.velocity.set(0, 0, 0);
     this.playCamYaw = veh.yaw + Math.PI;
     this.playCamPitch = veh.rig.isFlying ? 0.16 : 0.22;
+    this.sound.playVehicleEnter(veh.data.type);
 
     const name = VEHICLE_LABELS[veh.data.type];
     this.callbacks.onToast(
       veh.rig.isFlying
-        ? `${name} kontrolünde — WASD uçuş, Space yüksel, Shift alçal, E in.`
-        : `${name} direksiyonundasınız — WASD sürüş, Space el freni, E in.`,
+        ? `${name} kontrolünde — WASD uçuş, Space yüksel, Shift alçal, H korna, E in.`
+        : `${name} direksiyonundasınız — WASD sürüş, Space el freni, H korna, E in.`,
       'info'
     );
     this.emitSnapshot();
@@ -2380,9 +2401,8 @@ export class SandboxEngine {
     const veh = this.getActiveVehicle();
     this.inVehicle = false;
     this.activeVehicleId = null;
-    this.playerBody.mass = 72;
-    this.playerBody.updateMassProperties();
-    this.playerBody.collisionResponse = true;
+    this.restorePlayerDynamicBody();
+    this.sound.playVehicleExit();
 
     if (veh) {
       const offset = veh.rig.isFlying ? 3.2 : 2.2;
@@ -2391,9 +2411,10 @@ export class SandboxEngine {
       // Safely place player at ground height even if disembarking from an airborne Zeppelin
       this.playerBody.position.set(
         veh.body.position.x + leftX,
-        0.35,
+        0.2,
         veh.body.position.z + leftZ
       );
+      this.playerYaw = veh.yaw;
       this.explorer.root.rotation.set(0, veh.yaw, 0);
       veh.verticalSpeed = 0;
       if (veh.rig.isFlying) {
@@ -2403,12 +2424,22 @@ export class SandboxEngine {
     this.playerBody.velocity.set(0, 0, 0);
     this.explorer.leftLeg.rotation.x = 0;
     this.explorer.rightLeg.rotation.x = 0;
+    this.explorer.leftKnee.rotation.x = 0;
+    this.explorer.rightKnee.rotation.x = 0;
     this.explorer.leftArm.rotation.x = 0;
     this.explorer.rightArm.rotation.x = 0;
+    this.explorer.leftElbow.rotation.x = -0.12;
+    this.explorer.rightElbow.rotation.x = -0.12;
+    this.explorer.torso.position.y = 0.92;
+    this.explorer.torso.rotation.set(0, 0, 0);
     this.emitSnapshot();
   }
 
   // ==================== INPUT EVENTS ====================
+
+  private isKeyHeld(code: string, lowerKey?: string): boolean {
+    return this.keys.has(code) || (lowerKey !== undefined && this.keysLower.has(lowerKey));
+  }
 
   private onKeyDown = (e: KeyboardEvent) => {
     if (
@@ -2425,7 +2456,10 @@ export class SandboxEngine {
       return;
     }
 
+    this.sound.unlock();
+    const lower = e.key ? e.key.toLowerCase() : '';
     this.keys.add(e.code);
+    if (lower) this.keysLower.add(lower);
 
     if (this.mode === 'editor') {
       if (e.code === 'KeyR') {
@@ -2464,34 +2498,63 @@ export class SandboxEngine {
         }
       }
     } else {
-      if (e.code === 'KeyF') {
+      if (
+        e.code === 'Space' ||
+        e.code === 'ArrowUp' ||
+        e.code === 'ArrowDown' ||
+        e.code === 'ArrowLeft' ||
+        e.code === 'ArrowRight'
+      ) {
+        e.preventDefault();
+      }
+
+      if (e.code === 'KeyF' || lower === 'f') {
         if (!this.inVehicle && this.nearNpcId) {
           e.preventDefault();
           this.interactWithNearNpc();
         }
-      } else if (e.code === 'KeyE') {
+      } else if (e.code === 'KeyE' || lower === 'e') {
         e.preventDefault();
         if (this.inVehicle || this.nearVehicle) {
           this.toggleVehicle();
         } else if (this.nearNpcId) {
           this.interactWithNearNpc();
         }
+      } else if ((e.code === 'KeyH' || lower === 'h') && this.inVehicle) {
+        const activeVeh = this.getActiveVehicle();
+        if (activeVeh && !e.repeat) {
+          e.preventDefault();
+          this.sound.playVehicleHorn(activeVeh.data.type);
+        }
       } else if (e.code === 'Space' && !this.inVehicle && this.isGrounded && this.jumpCooldown <= 0) {
-        e.preventDefault();
+        this.restorePlayerDynamicBody();
         this.playerBody.velocity.y = 8.4;
         this.isGrounded = false;
         this.jumpCooldown = 0.35;
+        this.sound.playJump();
       }
     }
   };
 
   private onKeyUp = (e: KeyboardEvent) => {
     this.keys.delete(e.code);
+    if (e.key) this.keysLower.delete(e.key.toLowerCase());
+  };
+
+  private onWindowBlur = () => {
+    this.keys.clear();
+    this.keysLower.clear();
+    this.isRightMouseDown = false;
+    this.isLeftDraggingPlay = false;
   };
 
   private onPointerDown = (e: PointerEvent) => {
+    this.sound.unlock();
     const canvas = this.renderer.domElement;
     if (e.target !== canvas) return;
+
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    canvas.focus({ preventScroll: true });
 
     this.lastPointerX = e.clientX;
     this.lastPointerY = e.clientY;
@@ -2648,6 +2711,7 @@ export class SandboxEngine {
     const canvas = this.renderer.domElement;
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
+    window.addEventListener('blur', this.onWindowBlur);
     window.addEventListener('resize', this.onResize);
     window.addEventListener('pointerup', this.onPointerUp);
     window.addEventListener('pointermove', this.onPointerMove);
@@ -2663,6 +2727,7 @@ export class SandboxEngine {
     const canvas = this.renderer.domElement;
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
+    window.removeEventListener('blur', this.onWindowBlur);
     window.removeEventListener('resize', this.onResize);
     window.removeEventListener('pointerup', this.onPointerUp);
     window.removeEventListener('pointermove', this.onPointerMove);
@@ -2715,6 +2780,7 @@ export class SandboxEngine {
         scale: this.placementScale,
       };
       this.addPlacedObject(objData);
+      this.sound.playPlaceObject(objData.type);
       this.emitSnapshot();
       return;
     }
@@ -2729,6 +2795,7 @@ export class SandboxEngine {
         scale: THREE.MathUtils.clamp(this.placementScale, 0.7, 1.8),
       };
       this.addNpcEntity(npcData);
+      this.sound.playNpcGreet();
       this.callbacks.onToast(`"${npcData.name}" sahneye yerleştirildi.`, 'success');
       this.emitSnapshot();
       return;
@@ -2743,6 +2810,7 @@ export class SandboxEngine {
         rotationY: THREE.MathUtils.degToRad(this.placementRotationDeg),
       };
       this.addVehicleEntity(vehData);
+      this.sound.playPlaceObject();
       this.callbacks.onToast(`${VEHICLE_LABELS[vehData.type]} sahneye yerleştirildi.`, 'success');
       this.emitSnapshot();
       return;
@@ -2755,6 +2823,7 @@ export class SandboxEngine {
       if (!last || Math.hypot(last[0] - this.cursorGroundPos.x, last[1] - this.cursorGroundPos.z) > 0.75) {
         this.activeRoadPoints.push([this.cursorGroundPos.x, this.cursorGroundPos.z]);
         this.rebuildRoadPreview();
+        this.sound.playRoadNode(this.activeTool.style);
         this.emitSnapshot();
       }
       return;
@@ -2949,7 +3018,14 @@ export class SandboxEngine {
       }
     }
 
-    this.world.step(1 / 60, fixedDt, 3);
+    // Step physics deterministically every frame (no high-Hz sub-frame stalls)
+    if (fixedDt > 0.022) {
+      const half = fixedDt * 0.5;
+      this.world.step(half);
+      this.world.step(half);
+    } else if (fixedDt > 0.0001) {
+      this.world.step(fixedDt);
+    }
 
     for (const veh of this.vehicles.values()) {
       if (!veh.rig.isFlying && veh.body.position.y < 0.02) {
@@ -2963,16 +3039,35 @@ export class SandboxEngine {
       _vecA.copy(activeVeh.rig.seatAnchor).applyQuaternion(activeVeh.rig.root.quaternion);
       this.explorer.root.position.copy(activeVeh.rig.root.position).add(_vecA);
       this.explorer.root.rotation.set(0, activeVeh.yaw, 0);
-      this.explorer.leftLeg.rotation.x = -1.25;
-      this.explorer.rightLeg.rotation.x = -1.25;
-      this.explorer.leftArm.rotation.x = -0.95;
-      this.explorer.rightArm.rotation.x = -0.95;
+      this.explorer.leftLeg.rotation.x = -1.35;
+      this.explorer.rightLeg.rotation.x = -1.35;
+      this.explorer.leftKnee.rotation.x = 1.25;
+      this.explorer.rightKnee.rotation.x = 1.25;
+      this.explorer.leftArm.rotation.x = -0.82;
+      this.explorer.rightArm.rotation.x = -0.82;
+      this.explorer.leftElbow.rotation.x = -0.35;
+      this.explorer.rightElbow.rotation.x = -0.35;
+      this.explorer.torso.position.y = 0.92;
+      this.explorer.torso.rotation.set(0, 0, 0);
       this.nearVehicle = true;
       this.nearVehicleId = activeVeh.data.id;
     } else {
-      if (this.playerBody.position.y <= 0.16 && Math.abs(this.playerBody.velocity.y) < 0.8) {
+      const wasGrounded = this.isGrounded;
+      if (this.playerBody.position.y < 0) {
+        this.playerBody.position.y = 0;
+        if (this.playerBody.velocity.y < 0) this.playerBody.velocity.y = 0;
+      }
+      if (
+        (this.playerBody.position.y <= 0.24 && Math.abs(this.playerBody.velocity.y) < 0.85) ||
+        Math.abs(this.playerBody.velocity.y) < 0.05
+      ) {
         this.isGrounded = true;
       }
+      if (!wasGrounded && this.isGrounded) {
+        const landSurf = this.detectGroundSurfaceAt(this.playerBody.position.x, this.playerBody.position.z);
+        this.sound.playLand(landSurf);
+      }
+
       this.explorer.root.position.set(
         this.playerBody.position.x,
         Math.max(0, this.playerBody.position.y),
@@ -2980,19 +3075,69 @@ export class SandboxEngine {
       );
 
       const hSpeed = Math.hypot(this.playerBody.velocity.x, this.playerBody.velocity.z);
-      if (hSpeed > 0.35 && this.isGrounded) {
-        this.walkCycle += fixedDt * hSpeed * 1.9;
-        const swing = Math.sin(this.walkCycle) * Math.min(0.75, hSpeed * 0.11);
-        this.explorer.leftLeg.rotation.x = swing;
-        this.explorer.rightLeg.rotation.x = -swing;
-        this.explorer.leftArm.rotation.x = -swing * 0.85;
-        this.explorer.rightArm.rotation.x = swing * 0.85;
+      const settle = 1 - Math.exp(-11 * fixedDt);
+
+      if (hSpeed > 0.25 && this.isGrounded) {
+        this.walkCycle += fixedDt * (2.6 + hSpeed * 1.45);
+        const stepCount = Math.floor(this.walkCycle / Math.PI);
+        if (stepCount !== this.lastStepCount) {
+          this.lastStepCount = stepCount;
+          const surf = this.detectGroundSurfaceAt(this.playerBody.position.x, this.playerBody.position.z);
+          this.sound.playFootstep(surf, hSpeed > 7.4);
+        }
+        const strideAmp = Math.min(0.86, 0.22 + hSpeed * 0.068);
+        const phase = this.walkCycle;
+        const sinP = Math.sin(phase);
+
+        // Natural human thigh & shin articulation (knees flex during swing recovery)
+        const cosP = Math.cos(phase);
+        this.explorer.leftLeg.rotation.x = sinP * strideAmp;
+        this.explorer.rightLeg.rotation.x = -sinP * strideAmp;
+        this.explorer.leftKnee.rotation.x = Math.max(0, -cosP) * (strideAmp * 1.15);
+        this.explorer.rightKnee.rotation.x = Math.max(0, cosP) * (strideAmp * 1.15);
+
+        // Counter-swinging arms with natural elbow flexion
+        this.explorer.leftArm.rotation.x = -sinP * strideAmp * 0.72;
+        this.explorer.rightArm.rotation.x = sinP * strideAmp * 0.72;
+        this.explorer.leftElbow.rotation.x = -0.2 - Math.max(0, -sinP) * strideAmp * 0.65;
+        this.explorer.rightElbow.rotation.x = -0.2 - Math.max(0, sinP) * strideAmp * 0.65;
+
+        // Subtle torso stride bounce, counter-rotation twist & sprint lean
+        const targetBounceY = 0.92 + Math.abs(sinP) * Math.min(0.048, hSpeed * 0.0055);
+        this.explorer.torso.position.y = THREE.MathUtils.lerp(this.explorer.torso.position.y, targetBounceY, settle);
+        this.explorer.torso.rotation.y = THREE.MathUtils.lerp(this.explorer.torso.rotation.y, sinP * 0.085, settle);
+        this.explorer.torso.rotation.x = THREE.MathUtils.lerp(
+          this.explorer.torso.rotation.x,
+          Math.min(0.13, hSpeed * 0.012),
+          settle
+        );
+      } else if (!this.isGrounded) {
+        // Athletic mid-air jump posture
+        this.explorer.leftLeg.rotation.x = THREE.MathUtils.lerp(this.explorer.leftLeg.rotation.x, -0.32, settle);
+        this.explorer.rightLeg.rotation.x = THREE.MathUtils.lerp(this.explorer.rightLeg.rotation.x, 0.18, settle);
+        this.explorer.leftKnee.rotation.x = THREE.MathUtils.lerp(this.explorer.leftKnee.rotation.x, 0.55, settle);
+        this.explorer.rightKnee.rotation.x = THREE.MathUtils.lerp(this.explorer.rightKnee.rotation.x, 0.42, settle);
+        this.explorer.leftArm.rotation.x = THREE.MathUtils.lerp(this.explorer.leftArm.rotation.x, -0.45, settle);
+        this.explorer.rightArm.rotation.x = THREE.MathUtils.lerp(this.explorer.rightArm.rotation.x, -0.35, settle);
+        this.explorer.leftElbow.rotation.x = THREE.MathUtils.lerp(this.explorer.leftElbow.rotation.x, -0.45, settle);
+        this.explorer.rightElbow.rotation.x = THREE.MathUtils.lerp(this.explorer.rightElbow.rotation.x, -0.45, settle);
       } else {
-        const settle = 1 - Math.exp(-10 * fixedDt);
+        // Calm idle stance with subtle breathing
         this.explorer.leftLeg.rotation.x = THREE.MathUtils.lerp(this.explorer.leftLeg.rotation.x, 0, settle);
         this.explorer.rightLeg.rotation.x = THREE.MathUtils.lerp(this.explorer.rightLeg.rotation.x, 0, settle);
+        this.explorer.leftKnee.rotation.x = THREE.MathUtils.lerp(this.explorer.leftKnee.rotation.x, 0, settle);
+        this.explorer.rightKnee.rotation.x = THREE.MathUtils.lerp(this.explorer.rightKnee.rotation.x, 0, settle);
         this.explorer.leftArm.rotation.x = THREE.MathUtils.lerp(this.explorer.leftArm.rotation.x, 0, settle);
         this.explorer.rightArm.rotation.x = THREE.MathUtils.lerp(this.explorer.rightArm.rotation.x, 0, settle);
+        this.explorer.leftElbow.rotation.x = THREE.MathUtils.lerp(this.explorer.leftElbow.rotation.x, -0.12, settle);
+        this.explorer.rightElbow.rotation.x = THREE.MathUtils.lerp(this.explorer.rightElbow.rotation.x, -0.12, settle);
+        this.explorer.torso.position.y = THREE.MathUtils.lerp(
+          this.explorer.torso.position.y,
+          0.92 + Math.sin(this.npcAnimTime * 2.0) * 0.008,
+          settle
+        );
+        this.explorer.torso.rotation.y = THREE.MathUtils.lerp(this.explorer.torso.rotation.y, 0, settle);
+        this.explorer.torso.rotation.x = THREE.MathUtils.lerp(this.explorer.torso.rotation.x, 0, settle);
       }
 
       // Find nearest boardable vehicle
@@ -3018,12 +3163,16 @@ export class SandboxEngine {
   }
 
   private updateCharacterControls(dt: number) {
+    if (this.playerBody.type !== CANNON.Body.DYNAMIC || this.playerBody.mass <= 0) {
+      this.restorePlayerDynamicBody();
+    }
+
     const moveF =
-      (this.keys.has('KeyW') || this.keys.has('ArrowUp') ? 1 : 0) -
-      (this.keys.has('KeyS') || this.keys.has('ArrowDown') ? 1 : 0);
+      (this.isKeyHeld('KeyW', 'w') || this.keys.has('ArrowUp') ? 1 : 0) -
+      (this.isKeyHeld('KeyS', 's') || this.keys.has('ArrowDown') ? 1 : 0);
     const moveR =
-      (this.keys.has('KeyD') || this.keys.has('ArrowRight') ? 1 : 0) -
-      (this.keys.has('KeyA') || this.keys.has('ArrowLeft') ? 1 : 0);
+      (this.isKeyHeld('KeyD', 'd') || this.keys.has('ArrowRight') ? 1 : 0) -
+      (this.isKeyHeld('KeyA', 'a') || this.keys.has('ArrowLeft') ? 1 : 0);
 
     _vecForward.set(-Math.sin(this.playCamYaw), 0, -Math.cos(this.playCamYaw));
     _vecRight.set(Math.cos(this.playCamYaw), 0, -Math.sin(this.playCamYaw));
@@ -3034,8 +3183,9 @@ export class SandboxEngine {
 
     const maxSpeed = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') ? 10.2 : 6.0;
     if (_vecA.lengthSq() > 0.001) {
+      this.playerBody.wakeUp();
       _vecA.normalize();
-      const accel = 1 - Math.exp(-14 * dt);
+      const accel = 1 - Math.exp(-15 * dt);
       this.playerBody.velocity.x = THREE.MathUtils.lerp(
         this.playerBody.velocity.x,
         _vecA.x * maxSpeed,
@@ -3051,10 +3201,10 @@ export class SandboxEngine {
       let diff = targetYaw - this.playerYaw;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
-      this.playerYaw += diff * (1 - Math.exp(-12 * dt));
+      this.playerYaw += diff * (1 - Math.exp(-13 * dt));
       this.explorer.root.rotation.y = this.playerYaw;
     } else {
-      const decel = 1 - Math.exp(-11 * dt);
+      const decel = 1 - Math.exp(-12 * dt);
       this.playerBody.velocity.x = THREE.MathUtils.lerp(this.playerBody.velocity.x, 0, decel);
       this.playerBody.velocity.z = THREE.MathUtils.lerp(this.playerBody.velocity.z, 0, decel);
     }
@@ -3065,12 +3215,14 @@ export class SandboxEngine {
 
   private updateGroundVehicleControls(veh: RuntimeVehicle, dt: number) {
     const throttle =
-      (this.keys.has('KeyW') || this.keys.has('ArrowUp') ? 1 : 0) -
-      (this.keys.has('KeyS') || this.keys.has('ArrowDown') ? 1 : 0);
+      (this.isKeyHeld('KeyW', 'w') || this.keys.has('ArrowUp') ? 1 : 0) -
+      (this.isKeyHeld('KeyS', 's') || this.keys.has('ArrowDown') ? 1 : 0);
     const steerInput =
-      (this.keys.has('KeyA') || this.keys.has('ArrowLeft') ? 1 : 0) -
-      (this.keys.has('KeyD') || this.keys.has('ArrowRight') ? 1 : 0);
+      (this.isKeyHeld('KeyA', 'a') || this.keys.has('ArrowLeft') ? 1 : 0) -
+      (this.isKeyHeld('KeyD', 'd') || this.keys.has('ArrowRight') ? 1 : 0);
     const handbrake = this.keys.has('Space');
+    this.lastVehicleThrottle = throttle;
+    this.lastVehicleHandbrake = handbrake;
 
     _quat.set(
       veh.body.quaternion.x,
@@ -3130,20 +3282,22 @@ export class SandboxEngine {
 
   private updateFlyingVehicleControls(veh: RuntimeVehicle, dt: number) {
     const throttle =
-      (this.keys.has('KeyW') || this.keys.has('ArrowUp') ? 1 : 0) -
-      (this.keys.has('KeyS') || this.keys.has('ArrowDown') ? 1 : 0);
+      (this.isKeyHeld('KeyW', 'w') || this.keys.has('ArrowUp') ? 1 : 0) -
+      (this.isKeyHeld('KeyS', 's') || this.keys.has('ArrowDown') ? 1 : 0);
     const turnInput =
-      (this.keys.has('KeyA') || this.keys.has('ArrowLeft') ? 1 : 0) -
-      (this.keys.has('KeyD') || this.keys.has('ArrowRight') ? 1 : 0);
+      (this.isKeyHeld('KeyA', 'a') || this.keys.has('ArrowLeft') ? 1 : 0) -
+      (this.isKeyHeld('KeyD', 'd') || this.keys.has('ArrowRight') ? 1 : 0);
     const ascend = this.keys.has('Space') ? 1 : 0;
     const descend =
       this.keys.has('ShiftLeft') ||
       this.keys.has('ShiftRight') ||
-      this.keys.has('KeyC') ||
+      this.isKeyHeld('KeyC', 'c') ||
       this.keys.has('ControlLeft')
         ? 1
         : 0;
     const climbInput = ascend - descend;
+    this.lastVehicleThrottle = Math.max(Math.abs(throttle), ascend ? 0.85 : 0);
+    this.lastVehicleHandbrake = false;
 
     // Smooth forward/reverse aerial thrust
     if (throttle > 0) {
@@ -3399,18 +3553,30 @@ export class SandboxEngine {
       while (dYaw < -Math.PI) dYaw += Math.PI * 2;
       npc.rig.group.rotation.y += dYaw * (1 - Math.exp(-6.5 * dt));
 
-      const waveArm = npc.data.outfit === 'guard' ? npc.rig.leftArm : npc.rig.rightArm;
-      const idleArm = npc.data.outfit === 'guard' ? npc.rig.rightArm : npc.rig.leftArm;
+      const isGuard = npc.data.outfit === 'guard';
+      const waveArm = isGuard ? npc.rig.leftArm : npc.rig.rightArm;
+      const waveElbow = isGuard ? npc.rig.leftElbow : npc.rig.rightElbow;
+      const idleArm = isGuard ? npc.rig.rightArm : npc.rig.leftArm;
+      const restArmZ = isGuard ? -0.065 : 0.065;
       if (isPlayerClose) {
         waveArm.rotation.z = THREE.MathUtils.lerp(
           waveArm.rotation.z,
-          (npc.data.outfit === 'guard' ? 1 : -1) * (2.35 + Math.sin(t * 7.5) * 0.25),
+          (isGuard ? -1 : 1) * (2.35 + Math.sin(t * 7.5) * 0.22),
           1 - Math.exp(-9 * dt)
         );
+        waveElbow.rotation.x = THREE.MathUtils.lerp(
+          waveElbow.rotation.x,
+          -0.55 - Math.sin(t * 7.5) * 0.16,
+          1 - Math.exp(-9 * dt)
+        );
+        npc.rig.head.rotation.x = THREE.MathUtils.lerp(npc.rig.head.rotation.x, -0.04, 1 - Math.exp(-6 * dt));
       } else {
-        waveArm.rotation.z = THREE.MathUtils.lerp(waveArm.rotation.z, 0, 1 - Math.exp(-7 * dt));
+        waveArm.rotation.z = THREE.MathUtils.lerp(waveArm.rotation.z, restArmZ, 1 - Math.exp(-7 * dt));
+        waveElbow.rotation.x = THREE.MathUtils.lerp(waveElbow.rotation.x, -0.12, 1 - Math.exp(-7 * dt));
+        npc.rig.head.rotation.y = Math.sin(t * 0.85 + phase) * 0.14;
+        npc.rig.head.rotation.x = Math.sin(t * 1.1 + phase) * 0.03;
       }
-      idleArm.rotation.x = Math.sin(t * 1.4 + phase) * 0.06;
+      idleArm.rotation.x = Math.sin(t * 1.4 + phase) * 0.05;
     }
 
     this.nearNpcId = closestNpcId;
@@ -3434,6 +3600,7 @@ export class SandboxEngine {
             this.removeQuestBeacon(npcId);
             const npc = this.npcs.get(npcId);
             npc?.rig.setQuestMarkerStatus('ready');
+            this.sound.playQuestFanfare(false);
             this.callbacks.onToast(
               `Hedefe ulaşıldı! Ödül için ${qState.npcName} ile konuşun (F).`,
               'success'
@@ -3578,7 +3745,155 @@ export class SandboxEngine {
       speedKmh: activeVeh ? Math.round(Math.abs(activeVeh.speed) * 3.6) : 0,
       altitudeM: activeVeh ? Math.max(0, Math.round(activeVeh.body.position.y)) : 0,
       pointerLocked: this.pointerLocked,
+      audioMuted: this.sound.isMuted(),
     });
+  }
+
+  private detectGroundSurfaceAt(x: number, z: number): GroundSurfaceKind {
+    // 1. Check coastal / water / wood placed zones first
+    let foundSand = false;
+    let foundWater = false;
+    for (const obj of this.placedObjects.values()) {
+      const [ox, , oz] = obj.data.position;
+      const sc = obj.data.scale;
+      const t = obj.data.type;
+      const dx = x - ox;
+      const dz = z - oz;
+
+      if (t === 'woodenPier') {
+        const cos = Math.cos(-obj.data.rotationY);
+        const sin = Math.sin(-obj.data.rotationY);
+        const lx = dx * cos - dz * sin;
+        const lz = dx * sin + dz * cos;
+        if (Math.abs(lx) <= 7.2 * sc && Math.abs(lz) <= 2.3 * sc) {
+          return 'wood';
+        }
+      } else if (t === 'seaWaterPatch') {
+        if (Math.abs(dx) <= 10.2 * sc && Math.abs(dz) <= 10.2 * sc) {
+          foundWater = true;
+        }
+      } else if (t === 'swimmingPool') {
+        if (Math.abs(dx) <= 5.6 * sc && Math.abs(dz) <= 4.2 * sc) {
+          foundWater = true;
+        }
+      } else if (t === 'sandyBeachShore') {
+        if (Math.abs(dx) <= 8.4 * sc && Math.abs(dz) <= 7.4 * sc) {
+          foundSand = true;
+        }
+      } else if (t === 'beachVolleyball') {
+        if (Math.abs(dx) <= 6.2 * sc && Math.abs(dz) <= 4.2 * sc) {
+          foundSand = true;
+        }
+      } else if (t === 'beachCabanaSet') {
+        if (Math.abs(dx) <= 3.0 * sc && Math.abs(dz) <= 2.2 * sc) {
+          foundSand = true;
+        }
+      }
+    }
+    if (foundWater) return 'water';
+
+    // 2. Check road polylines for exact road surface type (asphalt, cobblestone, ancientStone, dirtRoad, sidewalkPath)
+    for (const road of this.roads.values()) {
+      const pts = road.data.points;
+      const halfW = getRoadTotalWidth(road.data.style, road.data.width) * 0.54;
+      const halfWSq = halfW * halfW;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const ax = pts[i][0];
+        const az = pts[i][1];
+        const bx = pts[i + 1][0];
+        const bz = pts[i + 1][1];
+        const abx = bx - ax;
+        const abz = bz - az;
+        const abLenSq = abx * abx + abz * abz;
+        const tProj =
+          abLenSq > 0.0001
+            ? Math.max(0, Math.min(1, ((x - ax) * abx + (z - az) * abz) / abLenSq))
+            : 0;
+        const px = ax + abx * tProj;
+        const pz = az + abz * tProj;
+        const dSq = (x - px) * (x - px) + (z - pz) * (z - pz);
+        if (dSq <= halfWSq) {
+          return road.data.style;
+        }
+      }
+    }
+
+    if (foundSand) return 'sand';
+    return 'grass';
+  }
+
+  private updateWorldAudio(dt: number) {
+    const activeVeh = this.mode === 'play' ? this.getActiveVehicle() : null;
+    const lx =
+      this.mode === 'play'
+        ? activeVeh
+          ? activeVeh.body.position.x
+          : this.playerBody.position.x
+        : this.camera.position.x;
+    const ly =
+      this.mode === 'play'
+        ? activeVeh
+          ? activeVeh.body.position.y
+          : this.playerBody.position.y
+        : this.camera.position.y;
+    const lz =
+      this.mode === 'play'
+        ? activeVeh
+          ? activeVeh.body.position.z
+          : this.playerBody.position.z
+        : this.camera.position.z;
+
+    let minSeaDist = Infinity;
+    let minFountainDist = Infinity;
+    for (const obj of this.placedObjects.values()) {
+      const t = obj.data.type;
+      if (t === 'seaWaterPatch' || t === 'sandyBeachShore') {
+        const d = Math.hypot(lx - obj.data.position[0], lz - obj.data.position[2]);
+        if (d < minSeaDist) minSeaDist = d;
+      } else if (t === 'fountain' || t === 'swimmingPool') {
+        const d = Math.hypot(lx - obj.data.position[0], lz - obj.data.position[2]);
+        if (d < minFountainDist) minFountainDist = d;
+      }
+    }
+
+    const seaProximity = minSeaDist < 44 ? Math.max(0, 1 - Math.max(0, minSeaDist - 8) / 36) : 0;
+    const fountainProximity =
+      minFountainDist < 22 ? Math.max(0, 1 - Math.max(0, minFountainDist - 2.5) / 19.5) : 0;
+    const windBoost = activeVeh ? Math.min(1, Math.abs(activeVeh.speed) / 24) : 0;
+
+    this.sound.updateAmbience({
+      dt,
+      timeOfDay: this.timeOfDay,
+      seaProximity,
+      fountainProximity,
+      altitudeM: Math.max(0, ly),
+      windBoost,
+    });
+
+    if (activeVeh) {
+      const vehSurface = activeVeh.rig.isFlying
+        ? 'grass'
+        : this.detectGroundSurfaceAt(activeVeh.body.position.x, activeVeh.body.position.z);
+      this.sound.updateVehicleAudio({
+        dt,
+        type: activeVeh.data.type,
+        speed: activeVeh.speed,
+        throttle: this.lastVehicleThrottle,
+        altitudeM: Math.max(0, activeVeh.body.position.y),
+        handbrake: this.lastVehicleHandbrake,
+        surface: vehSurface,
+      });
+    } else {
+      this.sound.updateVehicleAudio({
+        dt,
+        type: null,
+        speed: 0,
+        throttle: 0,
+        altitudeM: 0,
+        handbrake: false,
+        surface: 'grass',
+      });
+    }
   }
 
   private afterDraw(cb: () => void) {
@@ -3619,6 +3934,7 @@ export class SandboxEngine {
       }
     }
 
+    this.updateWorldAudio(dt);
     this.renderer.render(this.scene, this.camera);
 
     if (this.isSoftwareGl) {

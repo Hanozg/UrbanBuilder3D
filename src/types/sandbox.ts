@@ -259,6 +259,7 @@ export interface EngineSnapshot {
   speedKmh: number;
   altitudeM: number;
   pointerLocked: boolean;
+  audioMuted: boolean;
 }
 
 export interface MinimapObjectItem {

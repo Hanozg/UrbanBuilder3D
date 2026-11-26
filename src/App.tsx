@@ -82,6 +82,7 @@ const INITIAL_SNAPSHOT: EngineSnapshot = {
   speedKmh: 0,
   altitudeM: 0,
   pointerLocked: false,
+  audioMuted: false,
 };
 
 interface ToastMessage {
@@ -178,6 +179,10 @@ export default function App() {
 
   const handleTimeOfDayChange = useCallback((tod: TimeOfDay) => {
     engineRef.current?.setTimeOfDay(tod);
+  }, []);
+
+  const handleToggleAudioMute = useCallback(() => {
+    engineRef.current?.toggleAudioMute();
   }, []);
 
   const handleSelectTool = useCallback((tool: ActiveTool) => {
@@ -449,8 +454,10 @@ export default function App() {
         timeOfDay={snapshot.timeOfDay}
         npcCount={snapshot.npcCount}
         relationCount={snapshot.npcRelations.length}
+        audioMuted={snapshot.audioMuted}
         onModeChange={handleModeChange}
         onTimeOfDayChange={handleTimeOfDayChange}
+        onToggleAudioMute={handleToggleAudioMute}
         onOpenRelationGraph={() => setRelationGraphOpen(true)}
         onExportJson={handleExportJson}
         onImportJsonFile={handleImportJsonFile}

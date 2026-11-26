@@ -103,6 +103,10 @@ export const BottomHud: React.FC<BottomHudProps> = ({ snapshot, onTalkToNearNpc 
                   </span>
                   <span aria-hidden="true">·</span>
                   <span>
+                    <strong className="font-mono text-[#f3efe8]">H</strong> Korna
+                  </span>
+                  <span aria-hidden="true">·</span>
+                  <span>
                     <strong className="font-mono text-[#f3efe8]">E</strong> İn
                   </span>
                   <span aria-hidden="true">·</span>
@@ -118,6 +122,10 @@ export const BottomHud: React.FC<BottomHudProps> = ({ snapshot, onTalkToNearNpc 
                   <span aria-hidden="true">·</span>
                   <span>
                     <strong className="font-mono text-[#f3efe8]">Space</strong> El Freni
+                  </span>
+                  <span aria-hidden="true">·</span>
+                  <span>
+                    <strong className="font-mono text-[#f3efe8]">H</strong> Korna
                   </span>
                   <span aria-hidden="true">·</span>
                   <span>

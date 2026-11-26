@@ -4,6 +4,7 @@ import { ProceduralTextureLibrary } from './textures';
 import { buildExtendedPlaceableAsset } from './modelsExtended';
 import { buildMiddleEarthAsset, MiddleEarthPlaceableType } from './middleEarthModels';
 import { buildSummerAsset, SummerPlaceableType } from './summerModels';
+import { buildSculptedHumanoid } from './humanoidBuilder';
 
 export interface ColliderBoxDef {
   /** Local center relative to object bottom-center origin */
@@ -1682,231 +1683,45 @@ export interface ExplorerRig {
   root: THREE.Group;
   leftLeg: THREE.Group;
   rightLeg: THREE.Group;
+  leftKnee: THREE.Group;
+  rightKnee: THREE.Group;
   leftArm: THREE.Group;
   rightArm: THREE.Group;
+  leftElbow: THREE.Group;
+  rightElbow: THREE.Group;
   torso: THREE.Group;
+  head: THREE.Group;
 }
 
 export function buildExplorerCharacter(mats: MaterialLibrary): ExplorerRig {
-  const root = new THREE.Group();
-
-  const skinMat = new THREE.MeshStandardMaterial({
-    color: 0xe3b38e,
-    roughness: 0.7,
-    metalness: 0.03,
-    flatShading: false,
-  });
-  const jacketMat = new THREE.MeshStandardMaterial({
-    color: 0x2c4b5c,
-    roughness: 0.7,
-    metalness: 0.06,
-    flatShading: false,
-  });
-  const shirtMat = new THREE.MeshStandardMaterial({
-    color: 0xf0e8d8,
-    roughness: 0.72,
-    metalness: 0.03,
-    flatShading: false,
-  });
-  const pantsMat = new THREE.MeshStandardMaterial({
-    color: 0x2b2d34,
-    roughness: 0.72,
-    metalness: 0.04,
-    flatShading: false,
-  });
-  const hairMat = new THREE.MeshStandardMaterial({
-    color: 0x2a1d14,
-    roughness: 0.7,
-    metalness: 0.05,
-    flatShading: false,
-  });
-  const bootMat = new THREE.MeshStandardMaterial({
-    color: 0x4b2f1c,
-    roughness: 0.68,
-    metalness: 0.1,
-    flatShading: false,
-  });
-  const satchelMat = new THREE.MeshStandardMaterial({
-    color: 0x6b3e22,
-    roughness: 0.68,
-    metalness: 0.08,
-    flatShading: false,
-  });
-  const shadesMat = new THREE.MeshStandardMaterial({
-    color: 0x1b1e26,
-    roughness: 0.25,
-    metalness: 0.35,
-    flatShading: false,
-  });
-
-  const torso = new THREE.Group();
-  torso.position.y = 0.92;
-  root.add(torso);
-
-  // Smooth sculpted pelvis blending waist and hip joints seamlessly
-  const pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.21, 24, 18), pantsMat);
-  pelvis.scale.set(1.06, 0.72, 0.74);
-  pelvis.position.y = -0.02;
-  torso.add(pelvis);
-
-  // Contoured anatomical LatheGeometry Explorer Jacket Torso (zero BoxGeometry)
-  const chestProfile = [
-    new THREE.Vector2(0.005, -0.02),
-    new THREE.Vector2(0.198, 0.02),
-    new THREE.Vector2(0.192, 0.14),
-    new THREE.Vector2(0.212, 0.28),
-    new THREE.Vector2(0.244, 0.44),
-    new THREE.Vector2(0.228, 0.52),
-    new THREE.Vector2(0.162, 0.57),
-    new THREE.Vector2(0.095, 0.595),
-    new THREE.Vector2(0.005, 0.6),
-  ];
-  const chest = new THREE.Mesh(new THREE.LatheGeometry(chestProfile, 32), jacketMat);
-  chest.scale.set(1.04, 1.0, 0.7);
-  torso.add(chest);
-
-  // Smooth contoured shirt collar & waist belt
-  const collar = new THREE.Mesh(new THREE.TorusGeometry(0.105, 0.036, 14, 28), shirtMat);
-  collar.rotation.x = Math.PI / 2;
-  collar.position.set(0, 0.565, 0.01);
-  torso.add(collar);
-
-  const belt = new THREE.Mesh(new THREE.TorusGeometry(0.198, 0.032, 12, 28), bootMat);
-  belt.rotation.x = Math.PI / 2;
-  belt.scale.set(1.06, 0.74, 1.0);
-  belt.position.y = 0.06;
-  torso.add(belt);
-
-  // Sculpted crossbody TubeGeometry strap + rounded CapsuleGeometry explorer satchel
-  const strapCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(0.15, 0.56, 0.01),
-    new THREE.Vector3(0.03, 0.34, 0.168),
-    new THREE.Vector3(-0.24, 0.11, 0.02),
-    new THREE.Vector3(-0.04, 0.3, -0.158),
-    new THREE.Vector3(0.15, 0.56, 0.01),
-  ]);
-  const bagStrap = new THREE.Mesh(new THREE.TubeGeometry(strapCurve, 32, 0.018, 10, true), satchelMat);
-  torso.add(bagStrap);
-
-  const bag = new THREE.Mesh(new THREE.CapsuleGeometry(0.082, 0.12, 12, 20), satchelMat);
-  bag.scale.set(0.75, 1.0, 1.18);
-  bag.position.set(-0.255, 0.08, -0.01);
-  torso.add(bag);
-
-  // Smooth neck + sculpted oval head + ears + nose
-  const neck = new THREE.Mesh(new THREE.CapsuleGeometry(0.064, 0.09, 10, 20), skinMat);
-  neck.position.y = 0.62;
-  torso.add(neck);
-
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.162, 28, 22), skinMat);
-  head.scale.set(0.95, 1.07, 0.98);
-  head.position.y = 0.74;
-  torso.add(head);
-
-  const nose = new THREE.Mesh(new THREE.CapsuleGeometry(0.016, 0.028, 8, 12), skinMat);
-  nose.position.set(0, 0.735, 0.156);
-  nose.rotation.x = -0.22;
-  torso.add(nose);
-
-  for (const sx of [-1, 1]) {
-    const ear = new THREE.Mesh(new THREE.SphereGeometry(0.028, 12, 10), skinMat);
-    ear.scale.set(0.55, 1.15, 0.8);
-    ear.position.set(sx * 0.152, 0.735, -0.005);
-    torso.add(ear);
-  }
-
-  // Sculpted layered hair dome + swept top wave
-  const hair = new THREE.Mesh(
-    new THREE.SphereGeometry(0.174, 28, 20, 0, Math.PI * 2, 0, Math.PI * 0.6),
-    hairMat
+  const h = buildSculptedHumanoid(
+    {
+      kind: 'explorer',
+      gender: 'male',
+      outfit: 'citizen',
+      skinColor: 0xe2b18c,
+      hairColor: 0x2c1e15,
+      primaryColor: 0x2d4e61,
+      secondaryColor: 0xc89a56,
+      eyeColor: 0x47685b,
+      isGhost: false,
+    },
+    mats
   );
-  hair.scale.set(0.98, 1.08, 1.02);
-  hair.position.set(0, 0.76, -0.012);
-  torso.add(hair);
 
-  // Sleek rounded aviator sunglasses (twin flattened spheres + curved metallic bridge)
-  for (const sx of [-0.056, 0.056]) {
-    const lens = new THREE.Mesh(new THREE.SphereGeometry(0.044, 16, 12), shadesMat);
-    lens.scale.set(1.18, 0.76, 0.42);
-    lens.position.set(sx, 0.752, 0.148);
-    torso.add(lens);
-  }
-  const shadesBridge = new THREE.Mesh(new THREE.CapsuleGeometry(0.009, 0.09, 6, 10), shadesMat);
-  shadesBridge.rotation.z = Math.PI / 2;
-  shadesBridge.position.set(0, 0.762, 0.154);
-  torso.add(shadesBridge);
-
-  // Smooth Articulated Arms (CapsuleGeometry + spherical shoulder/elbow joints)
-  const makeArm = (x: number) => {
-    const pivot = new THREE.Group();
-    pivot.position.set(x, 0.515, 0);
-
-    const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.07, 18, 14), jacketMat);
-    pivot.add(shoulder);
-
-    const upperArm = new THREE.Mesh(new THREE.CapsuleGeometry(0.058, 0.19, 10, 18), jacketMat);
-    upperArm.position.y = -0.145;
-    pivot.add(upperArm);
-
-    const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.054, 16, 12), jacketMat);
-    elbow.position.y = -0.27;
-    pivot.add(elbow);
-
-    const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.048, 0.16, 10, 18), jacketMat);
-    forearm.position.y = -0.38;
-    pivot.add(forearm);
-
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 14), skinMat);
-    hand.scale.set(0.88, 1.1, 0.78);
-    hand.position.y = -0.505;
-    pivot.add(hand);
-
-    torso.add(pivot);
-    return pivot;
+  return {
+    root: h.root,
+    leftLeg: h.leftLeg,
+    rightLeg: h.rightLeg,
+    leftKnee: h.leftKnee,
+    rightKnee: h.rightKnee,
+    leftArm: h.leftArm,
+    rightArm: h.rightArm,
+    leftElbow: h.leftElbow,
+    rightElbow: h.rightElbow,
+    torso: h.torso,
+    head: h.head,
   };
-  const leftArm = makeArm(-0.295);
-  const rightArm = makeArm(0.295);
-
-  // Smooth Articulated Legs (CapsuleGeometry thigh/calf + spherical joints + rounded boots)
-  const makeLeg = (x: number) => {
-    const pivot = new THREE.Group();
-    pivot.position.set(x, 0.92, 0);
-
-    const hip = new THREE.Mesh(new THREE.SphereGeometry(0.084, 18, 14), pantsMat);
-    pivot.add(hip);
-
-    const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(0.076, 0.28, 10, 20), pantsMat);
-    thigh.position.y = -0.21;
-    pivot.add(thigh);
-
-    const knee = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 14), pantsMat);
-    knee.position.y = -0.415;
-    pivot.add(knee);
-
-    const calf = new THREE.Mesh(new THREE.CapsuleGeometry(0.064, 0.27, 10, 20), pantsMat);
-    calf.position.y = -0.61;
-    pivot.add(calf);
-
-    const bootAnkle = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.075, 10, 18), bootMat);
-    bootAnkle.position.set(0, -0.785, 0);
-    pivot.add(bootAnkle);
-
-    const bootFoot = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.115, 10, 18), bootMat);
-    bootFoot.rotation.x = Math.PI / 2;
-    bootFoot.scale.set(1.05, 1.0, 0.85);
-    bootFoot.position.set(0, -0.855, 0.048);
-    pivot.add(bootFoot);
-
-    root.add(pivot);
-    return pivot;
-  };
-  const leftLeg = makeLeg(-0.125);
-  const rightLeg = makeLeg(0.125);
-
-  enableShadows(root, true, true);
-  addContactShadow(root, mats.contactShadow, 0.52, 0.52);
-
-  return { root, leftLeg, rightLeg, leftArm, rightArm, torso };
 }
 
 /** Classic Open-Top Mediterranean Convertible Roadster */

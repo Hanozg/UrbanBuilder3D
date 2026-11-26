@@ -1,5 +1,17 @@
 import React, { useRef } from 'react';
-import { Download, Upload, Sun, Sunset, Moon, RotateCcw, Hammer, Play, Network } from 'lucide-react';
+import {
+  Download,
+  Upload,
+  Sun,
+  Sunset,
+  Moon,
+  RotateCcw,
+  Hammer,
+  Play,
+  Network,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
 import { AppMode, TimeOfDay } from '../types/sandbox';
 
 interface TopBarProps {
@@ -7,8 +19,10 @@ interface TopBarProps {
   timeOfDay: TimeOfDay;
   npcCount: number;
   relationCount: number;
+  audioMuted: boolean;
   onModeChange: (mode: AppMode) => void;
   onTimeOfDayChange: (tod: TimeOfDay) => void;
+  onToggleAudioMute: () => void;
   onOpenRelationGraph: () => void;
   onExportJson: () => void;
   onImportJsonFile: (file: File) => void;
@@ -20,8 +34,10 @@ export const TopBar: React.FC<TopBarProps> = ({
   timeOfDay,
   npcCount,
   relationCount,
+  audioMuted,
   onModeChange,
   onTimeOfDayChange,
+  onToggleAudioMute,
   onOpenRelationGraph,
   onExportJson,
   onImportJsonFile,
@@ -92,8 +108,27 @@ export const TopBar: React.FC<TopBarProps> = ({
         </button>
       </div>
 
-      {/* Top-Right: Time of Day + JSON Download / Upload */}
+      {/* Top-Right: Audio Mute + Time of Day + JSON Download / Upload */}
       <div className="pointer-events-auto flex items-center gap-2.5">
+        <button
+          type="button"
+          onClick={onToggleAudioMute}
+          title={audioMuted ? 'Sesi Aç' : 'Sesi Kapat'}
+          aria-label={audioMuted ? 'Sesi Aç' : 'Sesi Kapat'}
+          className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium shadow-lg transition-colors whitespace-nowrap cursor-pointer ${
+            audioMuted
+              ? 'border-white/10 bg-[#0f1115]/90 text-[#8e887f] hover:text-white'
+              : 'border-[#e59a3c]/35 bg-[#0f1115]/90 text-[#f5efe6] hover:border-[#e59a3c]/60'
+          }`}
+        >
+          {audioMuted ? (
+            <VolumeX className="h-3.5 w-3.5 text-[#8e887f]" />
+          ) : (
+            <Volume2 className="h-3.5 w-3.5 text-[#e59a3c]" />
+          )}
+          <span className="hidden xl:inline">{audioMuted ? 'Sessiz' : 'Ses Açık'}</span>
+        </button>
+
         {/* Time-of-Day Switch */}
         <div
           className="hidden md:flex items-center gap-1 rounded-xl border border-white/10 bg-[#0f1115]/90 p-1 shadow-lg"
